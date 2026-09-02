@@ -1,0 +1,133 @@
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Lead, Client, Profile, todayStr, dayDiff, followUpLabel, followUpTone, DOC_KEYS } from "@/lib/types";
+import { StatCard, Badge } from "@/components/ui";
+
+export default function DashboardPage() {
+  const supabase = createClient();
+  const [me, setMe] = useState<Profile | null>(null);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [staff, setStaff] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      setMe(profile);
+
+      const { data: leadRows } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
+      setLeads(leadRows || []);
+
+      if (profile?.role === "admin") {
+        const { data: clientRows } = await supabase.from("clients").select("*, client_documents(*), payments(*), refunds(*)");
+        setClients(clientRows || []);
+        const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff");
+        setStaff(staffRows || []);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading || !me) return <div className="text-slate-500 text-sm">Loading…</div>;
+  const isAdmin = me.role === "admin";
+  const today = todayStr();
+
+  const newLeads = leads.filter((l) => l.created_at.slice(0, 10) === today).length;
+  const dueToday = leads.filter((l) => l.next_followup_date === today).length;
+  const overdue = leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).length;
+  const upcoming = leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) > 0).length;
+  const overdueLeads = leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).slice(0, 6);
+  const todayLeads = leads.filter((l) => l.next_followup_date === today).slice(0, 6);
+
+  const docsPending = (c: any) => DOC_KEYS.some(([k]) => !c.client_documents?.find((d: any) => d.doc_key === k)?.received);
+  const balance = (c: any) => c.total_fee - (c.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <div className="text-sm font-semibold mb-3 text-ink">Today</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label={isAdmin ? "New leads" : "My new leads"} value={newLeads} tone="blue" />
+          <StatCard label="Follow-ups today" value={dueToday} tone="brass" />
+          <StatCard label="Overdue follow-ups" value={overdue} tone="red" />
+          <StatCard label="Upcoming follow-ups" value={upcoming} />
+        </div>
+      </div>
+
+      {isAdmin && (
+        <div>
+          <div className="text-sm font-semibold mb-3 text-ink">Clients</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Active clients" value={clients.length} tone="blue" />
+            <StatCard label="Documents pending" value={clients.filter(docsPending).length} tone="brass" />
+            <StatCard label="Payments pending" value={clients.filter((c) => balance(c) > 0).length} tone="red" />
+            <StatCard label="Pending with VFS" value={clients.filter((c) => c.visa_status === "Pending with VFS").length} />
+            <StatCard label="Approved" value={clients.filter((c) => c.visa_status === "Approved").length} tone="green" />
+            <StatCard label="Refused" value={clients.filter((c) => c.visa_status === "Refused").length} tone="red" />
+            <StatCard label="Refund pending" value={clients.filter((c: any) => c.refunds?.[0]?.applicable && c.refunds?.[0]?.status !== "Paid").length} tone="red" />
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div>
+          <div className="text-sm font-semibold mb-3 text-ink">Staff</div>
+          <div className="rounded-lg overflow-hidden border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-slate-50">
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Staff</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Assigned leads</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Overdue</th>
+              </tr></thead>
+              <tbody>
+                {staff.map((s) => {
+                  const mine = leads.filter((l) => l.assigned_staff_id === s.id);
+                  return (
+                    <tr key={s.id} className="border-t border-slate-200">
+                      <td className="px-4 py-2">{s.full_name}{!s.active && <Badge tone="red">Inactive</Badge>}</td>
+                      <td className="px-4 py-2">{mine.length}</td>
+                      <td className="px-4 py-2">{mine.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).length}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <div>
+          <div className="text-sm font-semibold mb-3 text-ink">Overdue — needs attention</div>
+          <MiniList leads={overdueLeads} empty="No overdue follow-ups." />
+        </div>
+        <div>
+          <div className="text-sm font-semibold mb-3 text-ink">Due today</div>
+          <MiniList leads={todayLeads} empty="Nothing due today." />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniList({ leads, empty }: { leads: Lead[]; empty: string }) {
+  if (!leads.length) return <div className="text-sm p-4 rounded-lg bg-white border border-slate-200 text-slate-400">{empty}</div>;
+  return (
+    <div className="rounded-lg border border-slate-200 divide-y bg-white">
+      {leads.map((l) => (
+        <Link key={l.id} href={`/leads/${l.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+          <div>
+            <div className="text-sm font-medium text-ink">{l.name}</div>
+            <div className="text-xs text-slate-400">{l.mobile}</div>
+          </div>
+          <Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge>
+        </Link>
+      ))}
+    </div>
+  );
+}

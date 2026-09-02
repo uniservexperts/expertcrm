@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #152238;
+}
+body {
+  color: #1c2433;
+}
+.text-ink { color: #1c2433; }
+.bg-navy { background-color: #152238; }
+.bg-navy2 { background-color: #1e304d; }
+.bg-navy3 { background-color: #2a4066; }
+.text-navy { color: #152238; }
+.text-navy3 { color: #2a4066; }
+.bg-clay { background-color: #b23a32; }
