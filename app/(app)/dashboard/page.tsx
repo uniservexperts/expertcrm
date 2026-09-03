@@ -122,7 +122,7 @@ function MiniList({ leads, empty }: { leads: Lead[]; empty: string }) {
       {leads.map((l) => (
         <Link key={l.id} href={`/leads/${l.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
           <div>
-            <div className="text-sm font-medium text-ink">{l.name}</div>
+            <div className="text-sm font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div>
             <div className="text-xs text-slate-400">{l.mobile}</div>
           </div>
           <Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge>
