@@ -58,10 +58,22 @@ export default function LeadDetailPage() {
     await logActivity("Note added", note.trim());
     setNote(""); load();
   }
+  const CLOSING_STATUSES = ["Not Interested", "Cancelled", "No Response"];
   async function changeStatus() {
     if (!lead || statusVal === lead.status) return;
-    await supabase.from("leads").update({ status: statusVal }).eq("id", id);
+    const isClosing = CLOSING_STATUSES.includes(statusVal);
+    const patch: any = { status: statusVal };
+    if (isClosing) {
+      patch.next_followup_date = null;
+      patch.next_followup_type = null;
+      patch.next_followup_note = null;
+      patch.next_followup_reminder = false;
+    }
+    await supabase.from("leads").update(patch).eq("id", id);
     await logActivity("Status changed", `${lead.status} → ${statusVal}`);
+    if (isClosing && lead.next_followup_date) {
+      await logActivity("Follow-up closed", `Lead marked "${statusVal}" — no further follow-up needed`);
+    }
     load();
   }
   async function setFollowUp() {
@@ -144,9 +156,15 @@ export default function LeadDetailPage() {
 
           <div className="p-3 rounded-md bg-slate-100">
             <div className="text-xs font-medium mb-1 text-slate-500">Next follow-up</div>
-            <div className={`text-sm font-medium ${followUpTone(lead.next_followup_date) === "red" ? "text-red-700" : "text-ink"}`}>{followUpLabel(lead.next_followup_date)}</div>
-            {lead.next_followup_note && <div className="text-sm mt-1 text-slate-600">{lead.next_followup_note}</div>}
-            {lead.next_followup_date && <div className="mt-2"><Btn variant="subtle" onClick={markCompleted}>Mark completed</Btn></div>}
+            {CLOSING_STATUSES.includes(lead.status) ? (
+              <div className="text-sm font-medium text-slate-500">Lead closed ({lead.status}) — no follow-up needed</div>
+            ) : (
+              <>
+                <div className={`text-sm font-medium ${followUpTone(lead.next_followup_date) === "red" ? "text-red-700" : "text-ink"}`}>{followUpLabel(lead.next_followup_date)}</div>
+                {lead.next_followup_note && <div className="text-sm mt-1 text-slate-600">{lead.next_followup_note}</div>}
+                {lead.next_followup_date && <div className="mt-2"><Btn variant="subtle" onClick={markCompleted}>Mark completed</Btn></div>}
+              </>
+            )}
           </div>
 
           <Field label="Add call note / feedback">
@@ -163,17 +181,19 @@ export default function LeadDetailPage() {
             </div>
           </Field>
 
-          <div className="p-3 rounded-md bg-slate-100">
-            <div className="text-xs font-medium mb-2 text-slate-500">Schedule next follow-up</div>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <input type="date" className={inputCls} value={fuDate} onChange={(e) => setFuDate(e.target.value)} />
-              <select className={inputCls} value={fuType} onChange={(e) => setFuType(e.target.value)}>
-                {FOLLOWUP_TYPES.map((t) => <option key={t}>{t}</option>)}
-              </select>
+          {!CLOSING_STATUSES.includes(lead.status) && (
+            <div className="p-3 rounded-md bg-slate-100">
+              <div className="text-xs font-medium mb-2 text-slate-500">Schedule next follow-up</div>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <input type="date" className={inputCls} value={fuDate} onChange={(e) => setFuDate(e.target.value)} />
+                <select className={inputCls} value={fuType} onChange={(e) => setFuType(e.target.value)}>
+                  {FOLLOWUP_TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <input className={inputCls + " mb-2"} placeholder="Note" value={fuNote} onChange={(e) => setFuNote(e.target.value)} />
+              <Btn onClick={setFollowUp}>Save follow-up</Btn>
             </div>
-            <input className={inputCls + " mb-2"} placeholder="Note" value={fuNote} onChange={(e) => setFuNote(e.target.value)} />
-            <Btn onClick={setFollowUp}>Save follow-up</Btn>
-          </div>
+          )}
 
           {isAdmin && (
             <Field label="Reassign staff">

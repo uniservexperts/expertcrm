@@ -32,12 +32,14 @@ export default function FollowUpCenterPage() {
 
   const today = todayStr();
   const tomorrow = addDays(today, 1);
+  const CLOSING_STATUSES = ["Not Interested", "Cancelled", "No Response"];
+  const isClosed = (l: Lead) => CLOSING_STATUSES.includes(l.status);
   const buckets: Record<string, Lead[]> = {
     today: leads.filter((l) => l.next_followup_date === today),
     tomorrow: leads.filter((l) => l.next_followup_date === tomorrow),
     upcoming: leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) > 1),
     overdue: leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0),
-    none: leads.filter((l) => !l.next_followup_date && !l.converted),
+    none: leads.filter((l) => !l.next_followup_date && !l.converted && !isClosed(l)),
     completed: leads.filter((l) => activityLeadIds.has(l.id)),
   };
   const tabs: [string, string][] = [["today", "Today"], ["tomorrow", "Tomorrow"], ["upcoming", "Upcoming"], ["overdue", "Overdue"], ["none", "No follow-up"], ["completed", "Completed"]];
