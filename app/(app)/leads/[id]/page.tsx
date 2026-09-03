@@ -21,6 +21,9 @@ export default function LeadDetailPage() {
   const [fuNote, setFuNote] = useState("");
   const [confirmConvert, setConfirmConvert] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [nameVal, setNameVal] = useState("");
+  const [locationVal, setLocationVal] = useState("");
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -32,6 +35,8 @@ export default function LeadDetailPage() {
     setLead(leadRow);
     setStatusVal(leadRow.status);
     setFuDate(leadRow.next_followup_date || "");
+    setNameVal(leadRow.name || "");
+    setLocationVal(leadRow.location || "");
     const { data: acts } = await supabase.from("lead_activities").select("*").eq("lead_id", id).order("created_at");
     setActivities(acts || []);
     const { data: statusRows } = await supabase.from("lead_statuses").select("name").order("sort_order");
@@ -80,6 +85,21 @@ export default function LeadDetailPage() {
     await logActivity("Staff reassigned", `${oldName} → ${newName}`);
     load();
   }
+  async function saveDetails() {
+    if (!lead) return;
+    const oldName = lead.name?.trim() || "(no name)";
+    const oldLocation = lead.location?.trim() || "(no location)";
+    const newName = nameVal.trim();
+    const newLocation = locationVal.trim();
+    if (newName === (lead.name || "") && newLocation === (lead.location || "")) { setEditingDetails(false); return; }
+    await supabase.from("leads").update({ name: newName, location: newLocation || null }).eq("id", id);
+    const changes: string[] = [];
+    if (newName !== (lead.name || "")) changes.push(`Name: ${oldName} → ${newName || "(no name)"}`);
+    if (newLocation !== (lead.location || "")) changes.push(`Location: ${oldLocation} → ${newLocation || "(no location)"}`);
+    await logActivity("Details updated", changes.join(" · "));
+    setEditingDetails(false);
+    load();
+  }
   async function convert() {
     const { data, error } = await supabase.rpc("convert_lead_to_client", { p_lead_id: id });
     if (error) { alert(error.message); return; }
@@ -92,15 +112,35 @@ export default function LeadDetailPage() {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-4 text-ink">{lead.lead_code} — {lead.name}</h2>
+      <h2 className="text-lg font-semibold mb-4 text-ink">
+        {lead.lead_code} — {lead.name?.trim() ? lead.name : <span className="text-amber-600 italic">Name pending</span>}
+      </h2>
       <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><div className="text-xs text-slate-400">Mobile</div><div>{lead.mobile}</div></div>
-            <div><div className="text-xs text-slate-400">Location</div><div>{lead.location || "—"}</div></div>
-            <div><div className="text-xs text-slate-400">Source</div><div>{lead.source || "—"}</div></div>
-            <div><div className="text-xs text-slate-400">Created</div><div>{fmtDate(lead.created_at.slice(0, 10))}</div></div>
-          </div>
+          {!editingDetails ? (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><div className="text-xs text-slate-400">Mobile</div><div>{lead.mobile}</div></div>
+              <div><div className="text-xs text-slate-400">Location</div><div>{lead.location || "—"}</div></div>
+              <div><div className="text-xs text-slate-400">Source</div><div>{lead.source || "—"}</div></div>
+              <div><div className="text-xs text-slate-400">Created</div><div>{fmtDate(lead.created_at.slice(0, 10))}</div></div>
+              <div className="col-span-2">
+                <Btn variant="ghost" onClick={() => setEditingDetails(true)}>Edit name / location</Btn>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 rounded-md bg-slate-100 space-y-2">
+              <Field label="Name">
+                <input className={inputCls} value={nameVal} onChange={(e) => setNameVal(e.target.value)} placeholder="e.g. Rohan Sharma" autoFocus />
+              </Field>
+              <Field label="Location">
+                <input className={inputCls} value={locationVal} onChange={(e) => setLocationVal(e.target.value)} placeholder="e.g. Hyderabad" />
+              </Field>
+              <div className="flex gap-2 pt-1">
+                <Btn onClick={saveDetails}>Save</Btn>
+                <Btn variant="ghost" onClick={() => { setNameVal(lead.name || ""); setLocationVal(lead.location || ""); setEditingDetails(false); }}>Cancel</Btn>
+              </div>
+            </div>
+          )}
 
           <div className="p-3 rounded-md bg-slate-100">
             <div className="text-xs font-medium mb-1 text-slate-500">Next follow-up</div>
@@ -165,7 +205,8 @@ export default function LeadDetailPage() {
 
       {confirmConvert && (
         <Modal title="Convert lead to client" onClose={() => setConfirmConvert(false)}>
-          <p className="text-sm text-slate-600 mb-4">This creates a client record for <b>{lead.name}</b> and preserves the full lead history. The client record will only be visible to Admin.</p>
+          <p className="text-sm text-slate-600 mb-4">This creates a client record for <b>{lead.name?.trim() || lead.mobile}</b> and preserves the full lead history. The client record will only be visible to Admin.</p>
+          {!lead.name?.trim() && <p className="text-xs text-amber-600 mb-4">This lead doesn't have a name yet — consider adding it first so the client record isn't blank.</p>}
           <div className="flex gap-2">
             <Btn onClick={convert}>Confirm conversion</Btn>
             <Btn variant="ghost" onClick={() => setConfirmConvert(false)}>Cancel</Btn>
