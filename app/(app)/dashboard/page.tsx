@@ -11,6 +11,7 @@ export default function DashboardPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
+  const [activitiesToday, setActivitiesToday] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,6 +29,8 @@ export default function DashboardPage() {
         setClients(clientRows || []);
         const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff");
         setStaff(staffRows || []);
+        const { data: actRows } = await supabase.from("lead_activities").select("*").gte("created_at", todayStr());
+        setActivitiesToday((actRows || []).filter((a) => a.created_at.slice(0, 10) === todayStr()));
       }
       setLoading(false);
     })();
@@ -95,6 +98,45 @@ export default function DashboardPage() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div>
+          <div className="text-sm font-semibold mb-3 text-ink">Staff activity today</div>
+          <div className="rounded-lg overflow-hidden border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-slate-50">
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Staff</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">New leads</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Notes added</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Status updates</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Follow-ups set</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Follow-ups completed</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Total actions</th>
+              </tr></thead>
+              <tbody>
+                {staff.map((s) => {
+                  const acts = activitiesToday.filter((a) => a.actor_id === s.id);
+                  const count = (type: string) => acts.filter((a) => a.activity_type === type).length;
+                  return (
+                    <tr key={s.id} className="border-t border-slate-200">
+                      <td className="px-4 py-2">{s.full_name}</td>
+                      <td className="px-4 py-2">{count("Lead created")}</td>
+                      <td className="px-4 py-2">{count("Note added")}</td>
+                      <td className="px-4 py-2">{count("Status changed")}</td>
+                      <td className="px-4 py-2">{count("Follow-up scheduled")}</td>
+                      <td className="px-4 py-2">{count("Follow-up completed")}</td>
+                      <td className="px-4 py-2 font-medium">{acts.length}</td>
+                    </tr>
+                  );
+                })}
+                {!activitiesToday.length && (
+                  <tr><td colSpan={7} className="px-4 py-3 text-center text-slate-400">No activity logged yet today.</td></tr>
+                )}
               </tbody>
             </table>
           </div>

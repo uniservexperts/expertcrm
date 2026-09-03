@@ -4,12 +4,15 @@ import { createClient } from "@/lib/supabase/client";
 import { todayStr, dayDiff, DOC_KEYS, LEAD_SOURCES } from "@/lib/types";
 import { StatCard } from "@/components/ui";
 
+const CLOSING_STATUSES = ["Not Interested", "Cancelled", "No Response"];
+
 export default function ReportsPage() {
   const supabase = createClient();
   const [leads, setLeads] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
   const [countries, setCountries] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
 
@@ -24,6 +27,8 @@ export default function ReportsPage() {
       setStaff(staffRows || []);
       const { data: countryRows } = await supabase.from("countries").select("*");
       setCountries(countryRows || []);
+      const { data: statusRows } = await supabase.from("lead_statuses").select("name").order("sort_order");
+      setStatuses((statusRows || []).map((s) => s.name));
       setLoading(false);
     })();
   }, []);
@@ -34,6 +39,8 @@ export default function ReportsPage() {
   const byStaff = staff.map((s) => ({ name: s.full_name, n: leads.filter((l) => l.assigned_staff_id === s.id).length }));
   const byCountry = countries.map((c) => ({ name: c.name, n: leads.filter((l) => l.country_id === c.id).length }));
   const bySource = LEAD_SOURCES.map((s) => ({ name: s, n: leads.filter((l) => l.source === s).length }));
+  const byStatus = statuses.map((s) => ({ name: s, n: leads.filter((l) => l.status === s).length })).filter((r) => r.n > 0);
+  const closedCount = leads.filter((l) => CLOSING_STATUSES.includes(l.status)).length;
   const balance = (c: any) => c.total_fee - (c.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
   const docsPending = (c: any) => DOC_KEYS.some(([k]) => !c.client_documents?.find((d: any) => d.doc_key === k)?.received);
 
@@ -46,13 +53,14 @@ export default function ReportsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <StatCard label="Total leads" value={leads.length} />
           <StatCard label="Converted" value={leads.filter((l) => l.converted).length} tone="green" />
-          <StatCard label="Not interested" value={leads.filter((l) => l.status === "Not Interested").length} tone="red" />
-          <StatCard label="Cancelled" value={leads.filter((l) => l.status === "Cancelled").length} tone="red" />
+          <StatCard label="Closed (no follow-up)" value={closedCount} tone="red" />
+          <StatCard label="Still active" value={leads.length - leads.filter((l) => l.converted).length - closedCount} tone="blue" />
         </div>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-4 gap-4">
           <ReportTable title="By staff" rows={byStaff} />
           <ReportTable title="By country" rows={byCountry} />
           <ReportTable title="By source" rows={bySource} />
+          <ReportTable title="By status" rows={byStatus} />
         </div>
       </div>
 
