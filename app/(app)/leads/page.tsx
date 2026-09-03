@@ -52,7 +52,7 @@ export default function LeadsPage() {
     if (!isAdmin) assignedStaffId = me!.id;
 
     const { data: newLead, error } = await supabase.from("leads").insert({
-      name: form.name, mobile: form.mobile, location: form.location, source: form.source,
+      name: form.name.trim(), mobile: form.mobile, location: form.location || null, source: form.source,
       country_id: form.countryId, assigned_staff_id: assignedStaffId, created_by: me!.id,
     }).select().single();
     if (error) { alert(error.message); return; }
@@ -95,7 +95,7 @@ export default function LeadsPage() {
             <tbody>
               {filtered.map((l) => (
                 <tr key={l.id} className="border-t border-slate-200">
-                  <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name}</div><div className="text-xs text-slate-400">{l.lead_code} · {l.mobile}</div></td>
+                  <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div><div className="text-xs text-slate-400">{l.lead_code} · {l.mobile}</div></td>
                   <td className="px-4 py-2.5"><Badge>{l.status}</Badge></td>
                   {isAdmin && <td className="px-4 py-2.5">{staffMap[l.assigned_staff_id || ""] || "Unassigned"}</td>}
                   <td className="px-4 py-2.5"><Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge></td>
@@ -127,16 +127,18 @@ function NewLeadModal({ isAdmin, staffOptions, countries, onClose, onCreate }: a
   const [err, setErr] = useState("");
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.mobile.trim()) { setErr("Name and mobile number are required."); return; }
+    if (!form.mobile.trim()) { setErr("Mobile number is required."); return; }
     onCreate(form);
   }
   return (
     <Modal title="New lead" onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
-        <Field label="Name"><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-        <Field label="Mobile number"><input className={inputCls} value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} /></Field>
+        <Field label="Mobile number"><input className={inputCls} value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} autoFocus /></Field>
+        <Field label="Name (leave blank if not known yet — you can add it after the first call)">
+          <input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Location"><input className={inputCls} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></Field>
+          <Field label="Location (optional)"><input className={inputCls} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></Field>
           <Field label="Country">
             <select className={inputCls} value={form.countryId} onChange={(e) => setForm({ ...form, countryId: Number(e.target.value) })}>
               {countries.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
