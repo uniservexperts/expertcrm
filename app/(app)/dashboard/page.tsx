@@ -12,6 +12,7 @@ export default function DashboardPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
   const [activitiesToday, setActivitiesToday] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,6 +24,9 @@ export default function DashboardPage() {
 
       const { data: leadRows } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
       setLeads(leadRows || []);
+
+      const { data: statusRows } = await supabase.from("lead_statuses").select("name").order("sort_order");
+      setStatuses((statusRows || []).map((s) => s.name));
 
       if (profile?.role === "admin") {
         const { data: clientRows } = await supabase.from("clients").select("*, client_documents(*), payments(*), refunds(*)");
@@ -55,10 +59,23 @@ export default function DashboardPage() {
       <div>
         <div className="text-sm font-semibold mb-3 text-ink">Today</div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label={isAdmin ? "New leads" : "My new leads"} value={newLeads} tone="blue" />
-          <StatCard label="Follow-ups today" value={dueToday} tone="brass" />
-          <StatCard label="Overdue follow-ups" value={overdue} tone="red" />
-          <StatCard label="Upcoming follow-ups" value={upcoming} />
+          <StatCard label={isAdmin ? "New leads" : "My new leads"} value={newLeads} tone="blue" link="/leads" />
+          <StatCard label="Follow-ups today" value={dueToday} tone="brass" link="/followups" />
+          <StatCard label="Overdue follow-ups" value={overdue} tone="red" link="/followups" />
+          <StatCard label="Upcoming follow-ups" value={upcoming} link="/followups" />
+        </div>
+      </div>
+
+      <div>
+        <div className="text-sm font-semibold mb-3 text-ink">{isAdmin ? "All leads by status" : "My leads by status"}</div>
+        <div className="rounded-lg border border-slate-200 bg-white p-2">
+          {statuses.map((s) => ({ name: s, n: leads.filter((l) => l.status === s).length })).filter((r) => r.n > 0).map((r, i) => (
+            <Link key={r.name} href={`/leads?status=${encodeURIComponent(r.name)}`} className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-slate-100 hover:bg-slate-50">
+              <span className="text-sm text-ink"><span className="text-slate-400 mr-2">{i + 1}.</span>{r.name}</span>
+              <span className="text-sm font-semibold text-navy3">{r.n}</span>
+            </Link>
+          ))}
+          {!leads.length && <div className="px-3 py-3 text-sm text-slate-400">No leads yet.</div>}
         </div>
       </div>
 
@@ -66,13 +83,13 @@ export default function DashboardPage() {
         <div>
           <div className="text-sm font-semibold mb-3 text-ink">Clients</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Active clients" value={clients.length} tone="blue" />
-            <StatCard label="Documents pending" value={clients.filter(docsPending).length} tone="brass" />
-            <StatCard label="Payments pending" value={clients.filter((c) => balance(c) > 0).length} tone="red" />
-            <StatCard label="Pending with VFS" value={clients.filter((c) => c.visa_status === "Pending with VFS").length} />
-            <StatCard label="Approved" value={clients.filter((c) => c.visa_status === "Approved").length} tone="green" />
-            <StatCard label="Refused" value={clients.filter((c) => c.visa_status === "Refused").length} tone="red" />
-            <StatCard label="Refund pending" value={clients.filter((c: any) => c.refunds?.[0]?.applicable && c.refunds?.[0]?.status !== "Paid").length} tone="red" />
+            <StatCard label="Active clients" value={clients.length} tone="blue" link="/clients" />
+            <StatCard label="Documents pending" value={clients.filter(docsPending).length} tone="brass" link="/clients" />
+            <StatCard label="Payments pending" value={clients.filter((c) => balance(c) > 0).length} tone="red" link="/clients" />
+            <StatCard label="Pending with VFS" value={clients.filter((c) => c.visa_status === "Pending with VFS").length} link="/clients" />
+            <StatCard label="Approved" value={clients.filter((c) => c.visa_status === "Approved").length} tone="green" link="/clients" />
+            <StatCard label="Refused" value={clients.filter((c) => c.visa_status === "Refused").length} tone="red" link="/clients" />
+            <StatCard label="Refund pending" value={clients.filter((c: any) => c.refunds?.[0]?.applicable && c.refunds?.[0]?.status !== "Paid").length} tone="red" link="/clients" />
           </div>
         </div>
       )}
@@ -93,7 +110,7 @@ export default function DashboardPage() {
                   return (
                     <tr key={s.id} className="border-t border-slate-200">
                       <td className="px-4 py-2">{s.full_name}{!s.active && <Badge tone="red">Inactive</Badge>}</td>
-                      <td className="px-4 py-2">{mine.length}</td>
+                      <td className="px-4 py-2"><Link href={`/leads?staffId=${s.id}`} className="text-navy3 font-medium hover:underline">{mine.length}</Link></td>
                       <td className="px-4 py-2">{mine.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).length}</td>
                     </tr>
                   );
@@ -116,12 +133,13 @@ export default function DashboardPage() {
                 <th className="text-left px-4 py-2 font-medium text-slate-500">Status updates</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-500">Follow-ups set</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-500">Follow-ups completed</th>
-                <th className="text-left px-4 py-2 font-medium text-slate-500">Total actions</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-500">Leads attended (unique)</th>
               </tr></thead>
               <tbody>
                 {staff.map((s) => {
                   const acts = activitiesToday.filter((a) => a.actor_id === s.id);
                   const count = (type: string) => acts.filter((a) => a.activity_type === type).length;
+                  const uniqueLeads = new Set(acts.map((a) => a.lead_id)).size;
                   return (
                     <tr key={s.id} className="border-t border-slate-200">
                       <td className="px-4 py-2">{s.full_name}</td>
@@ -130,7 +148,7 @@ export default function DashboardPage() {
                       <td className="px-4 py-2">{count("Status changed")}</td>
                       <td className="px-4 py-2">{count("Follow-up scheduled")}</td>
                       <td className="px-4 py-2">{count("Follow-up completed")}</td>
-                      <td className="px-4 py-2 font-medium">{acts.length}</td>
+                      <td className="px-4 py-2 font-medium">{uniqueLeads}</td>
                     </tr>
                   );
                 })}
@@ -139,6 +157,9 @@ export default function DashboardPage() {
                 )}
               </tbody>
             </table>
+            <div className="px-4 py-2 text-xs text-slate-400 border-t border-slate-200">
+              "Leads attended" counts each lead once per staff member today, even if it was created and its status updated in the same day — it's not a sum of the columns to the left.
+            </div>
           </div>
         </div>
       )}

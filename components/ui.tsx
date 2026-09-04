@@ -1,5 +1,6 @@
 "use client";
 import { ReactNode } from "react";
+import Link from "next/link";
 
 const TONES: Record<string, string> = {
   slate: "bg-slate-100 text-slate-600",
@@ -13,14 +14,22 @@ export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${TONES[tone] || TONES.slate}`}>{children}</span>;
 }
 
-export function StatCard({ label, value, tone = "slate" }: { label: string; value: number | string; tone?: string }) {
+export function StatCard({ label, value, tone = "slate", link }: { label: string; value: number | string; tone?: string; link?: string }) {
   const colors: Record<string, string> = { slate: "text-ink", red: "text-red-700", green: "text-emerald-700", brass: "text-amber-700", blue: "text-blue-700" };
-  return (
-    <div className="rounded-lg p-4 bg-white border border-slate-200">
+  const content = (
+    <>
       <div className="text-xs font-medium mb-1 text-slate-500">{label}</div>
       <div className={`text-2xl font-semibold ${colors[tone] || colors.slate}`}>{value}</div>
-    </div>
+    </>
   );
+  if (link) {
+    return (
+      <Link href={link} className="rounded-lg p-4 bg-white border border-slate-200 block hover:shadow-sm hover:border-slate-300 transition">
+        {content}
+      </Link>
+    );
+  }
+  return <div className="rounded-lg p-4 bg-white border border-slate-200">{content}</div>;
 }
 
 export function Btn({ children, onClick, variant = "primary", className = "", type = "button", disabled }: any) {

@@ -58,7 +58,7 @@ export default function LeadDetailPage() {
     await logActivity("Note added", note.trim());
     setNote(""); load();
   }
-  const CLOSING_STATUSES = ["Not Interested", "Cancelled", "No Response"];
+  const CLOSING_STATUSES = ["Not Interested"];
   async function changeStatus() {
     if (!lead || statusVal === lead.status) return;
     const isClosing = CLOSING_STATUSES.includes(statusVal);

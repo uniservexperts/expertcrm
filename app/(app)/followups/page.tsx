@@ -32,7 +32,7 @@ export default function FollowUpCenterPage() {
 
   const today = todayStr();
   const tomorrow = addDays(today, 1);
-  const CLOSING_STATUSES = ["Not Interested", "Cancelled", "No Response"];
+  const CLOSING_STATUSES = ["Not Interested"];
   const isClosed = (l: Lead) => CLOSING_STATUSES.includes(l.status);
   const buckets: Record<string, Lead[]> = {
     today: leads.filter((l) => l.next_followup_date === today),

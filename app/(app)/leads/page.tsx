@@ -1,20 +1,38 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, Profile, followUpLabel, followUpTone, LEAD_SOURCES } from "@/lib/types";
 import { Badge, Btn, Field, Modal, inputCls } from "@/components/ui";
 
+const CLOSING_STATUSES = ["Not Interested"];
+
 export default function LeadsPage() {
+  return (
+    <Suspense fallback={<div className="text-slate-500 text-sm">Loading…</div>}>
+      <LeadsPageInner />
+    </Suspense>
+  );
+}
+
+function LeadsPageInner() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
   const [me, setMe] = useState<Profile | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [staffOptions, setStaffOptions] = useState<Profile[]>([]);
   const [countries, setCountries] = useState<{ id: number; name: string }[]>([]);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get("status") || "all");
   const [showNew, setShowNew] = useState(false);
   const [dup, setDup] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const staffIdParam = searchParams.get("staffId");
+  const countryIdParam = searchParams.get("countryId");
+  const sourceParam = searchParams.get("source");
+  const specialParam = searchParams.get("special");
+  const hasUrlFilter = !!(staffIdParam || countryIdParam || sourceParam || specialParam);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -34,9 +52,25 @@ export default function LeadsPage() {
   useEffect(() => { load(); }, []);
 
   const staffMap = Object.fromEntries(staffOptions.map((s) => [s.id, s.full_name]));
+  const countryMap = Object.fromEntries(countries.map((c) => [c.id, c.name]));
   const isAdmin = me?.role === "admin";
   const statuses = [...new Set(leads.map((l) => l.status))];
-  const filtered = statusFilter === "all" ? leads : leads.filter((l) => l.status === statusFilter);
+
+  let filtered = statusFilter === "all" ? leads : leads.filter((l) => l.status === statusFilter);
+  if (staffIdParam) filtered = filtered.filter((l) => l.assigned_staff_id === staffIdParam);
+  if (countryIdParam) filtered = filtered.filter((l) => l.country_id === Number(countryIdParam));
+  if (sourceParam) filtered = filtered.filter((l) => l.source === sourceParam);
+  if (specialParam === "converted") filtered = filtered.filter((l) => l.converted);
+  if (specialParam === "closed") filtered = filtered.filter((l) => CLOSING_STATUSES.includes(l.status));
+  if (specialParam === "active") filtered = filtered.filter((l) => !l.converted && !CLOSING_STATUSES.includes(l.status));
+
+  const filterLabels: string[] = [];
+  if (staffIdParam) filterLabels.push(`Staff: ${staffMap[staffIdParam] || staffIdParam}`);
+  if (countryIdParam) filterLabels.push(`Country: ${countryMap[Number(countryIdParam)] || countryIdParam}`);
+  if (sourceParam) filterLabels.push(`Source: ${sourceParam}`);
+  if (specialParam === "converted") filterLabels.push("Converted leads");
+  if (specialParam === "closed") filterLabels.push("Closed (Not Interested)");
+  if (specialParam === "active") filterLabels.push("Still active leads");
 
   async function createLead(form: any) {
     const mobileDigits = form.mobile.replace(/\D/g, "");
@@ -79,6 +113,14 @@ export default function LeadsPage() {
           <Btn onClick={() => setShowNew(true)}>+ New lead</Btn>
         </div>
       </div>
+
+      {hasUrlFilter && (
+        <div className="mb-4 flex items-center gap-2 text-sm">
+          <span className="text-slate-500">Filtered by:</span>
+          {filterLabels.map((l) => <Badge key={l} tone="blue">{l}</Badge>)}
+          <Link href="/leads" className="text-xs text-navy3 underline">Clear filter</Link>
+        </div>
+      )}
 
       {!filtered.length ? (
         <div className="text-sm p-6 text-center rounded-lg bg-white border border-slate-200 text-slate-400">No leads found.</div>
