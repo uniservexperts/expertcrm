@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, Client, Profile, todayStr, dayDiff, followUpLabel, followUpTone, DOC_KEYS } from "@/lib/types";
+import { Lead, Client, Profile, todayStr, toLocalDateStr, dayDiff, followUpLabel, followUpTone, DOC_KEYS } from "@/lib/types";
 import { StatCard, Badge } from "@/components/ui";
 
 export default function DashboardPage() {
@@ -34,7 +34,7 @@ export default function DashboardPage() {
         const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff");
         setStaff(staffRows || []);
         const { data: actRows } = await supabase.from("lead_activities").select("*").gte("created_at", todayStr());
-        setActivitiesToday((actRows || []).filter((a) => a.created_at.slice(0, 10) === todayStr()));
+        setActivitiesToday((actRows || []).filter((a) => toLocalDateStr(a.created_at) === todayStr()));
       }
       setLoading(false);
     })();
@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const isAdmin = me.role === "admin";
   const today = todayStr();
 
-  const newLeads = leads.filter((l) => l.created_at.slice(0, 10) === today).length;
+  const newLeads = leads.filter((l) => toLocalDateStr(l.created_at) === today).length;
   const dueToday = leads.filter((l) => l.next_followup_date === today).length;
   const overdue = leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).length;
   const upcoming = leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) > 0).length;

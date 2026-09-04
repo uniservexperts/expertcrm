@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, LeadActivity, Profile, fmtDate, followUpLabel, followUpTone, FOLLOWUP_TYPES } from "@/lib/types";
+import { Lead, LeadActivity, Profile, fmtDate, toLocalDateStr, followUpLabel, followUpTone, FOLLOWUP_TYPES } from "@/lib/types";
 import { Badge, Btn, Field, inputCls, Modal } from "@/components/ui";
 
 export default function LeadDetailPage() {
@@ -134,7 +134,7 @@ export default function LeadDetailPage() {
               <div><div className="text-xs text-slate-400">Mobile</div><div>{lead.mobile}</div></div>
               <div><div className="text-xs text-slate-400">Location</div><div>{lead.location || "—"}</div></div>
               <div><div className="text-xs text-slate-400">Source</div><div>{lead.source || "—"}</div></div>
-              <div><div className="text-xs text-slate-400">Created</div><div>{fmtDate(lead.created_at.slice(0, 10))}</div></div>
+              <div><div className="text-xs text-slate-400">Created</div><div>{fmtDate(toLocalDateStr(lead.created_at))}</div></div>
               <div className="col-span-2">
                 <Btn variant="ghost" onClick={() => setEditingDetails(true)}>Edit name / location</Btn>
               </div>
