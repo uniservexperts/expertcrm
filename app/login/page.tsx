@@ -26,7 +26,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4 bg-navy">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="text-2xl font-semibold text-white tracking-tight">Meridian Immigration</div>
+          <div className="text-2xl font-semibold text-white tracking-tight">Uniserv Experts</div>
           <div className="text-sm mt-1 text-slate-300">Internal follow-up &amp; case CRM</div>
         </div>
         <form onSubmit={submit} className="rounded-lg p-6 bg-white space-y-4">

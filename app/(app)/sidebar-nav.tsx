@@ -35,7 +35,7 @@ export default function SidebarNav({ profile }: { profile: { full_name: string; 
   return (
     <div className="w-60 flex-shrink-0 flex flex-col bg-navy">
       <div className="px-5 py-5 border-b border-white/10">
-        <div className="text-white font-semibold text-sm tracking-tight">Meridian Immigration</div>
+        <div className="text-white font-semibold text-sm tracking-tight">Uniserv Experts</div>
         <div className="text-xs mt-0.5 text-slate-400">{isAdmin ? "Admin console" : "Staff workspace"}</div>
       </div>
       <div className="flex-1 py-3">

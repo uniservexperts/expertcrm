@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Meridian Immigration CRM",
+  title: "Uniserv Experts CRM",
   description: "Internal follow-up and case management CRM",
 };
 
