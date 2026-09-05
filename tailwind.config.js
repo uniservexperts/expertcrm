@@ -14,6 +14,9 @@ module.exports = {
         clay: "#B23A32",
         leaf: "#3D7A57",
       },
+      fontFamily: {
+        display: ["var(--font-jakarta)", "ui-sans-serif", "system-ui"],
+      },
     },
   },
   plugins: [],

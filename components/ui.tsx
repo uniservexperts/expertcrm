@@ -4,32 +4,50 @@ import Link from "next/link";
 
 const TONES: Record<string, string> = {
   slate: "bg-slate-100 text-slate-600",
-  brass: "bg-amber-50 text-amber-700",
-  red: "bg-red-50 text-red-700",
-  green: "bg-emerald-50 text-emerald-700",
-  blue: "bg-blue-50 text-blue-700",
+  brass: "bg-amber-100 text-amber-700",
+  red: "bg-rose-100 text-rose-700",
+  green: "bg-emerald-100 text-emerald-700",
+  blue: "bg-indigo-100 text-indigo-700",
+  violet: "bg-violet-100 text-violet-700",
 };
 
 export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: string }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${TONES[tone] || TONES.slate}`}>{children}</span>;
 }
 
-export function StatCard({ label, value, tone = "slate", link }: { label: string; value: number | string; tone?: string; link?: string }) {
-  const colors: Record<string, string> = { slate: "text-ink", red: "text-red-700", green: "text-emerald-700", brass: "text-amber-700", blue: "text-blue-700" };
+const STAT_TONES: Record<string, { text: string; chipBg: string; chipFg: string; border: string }> = {
+  slate: { text: "text-ink", chipBg: "bg-slate-100", chipFg: "text-slate-500", border: "border-l-slate-300" },
+  red: { text: "text-rose-700", chipBg: "bg-rose-100", chipFg: "text-rose-600", border: "border-l-rose-500" },
+  green: { text: "text-emerald-700", chipBg: "bg-emerald-100", chipFg: "text-emerald-600", border: "border-l-emerald-500" },
+  brass: { text: "text-amber-700", chipBg: "bg-amber-100", chipFg: "text-amber-600", border: "border-l-amber-500" },
+  blue: { text: "text-indigo-700", chipBg: "bg-indigo-100", chipFg: "text-indigo-600", border: "border-l-indigo-500" },
+  violet: { text: "text-violet-700", chipBg: "bg-violet-100", chipFg: "text-violet-600", border: "border-l-violet-500" },
+};
+
+export function StatCard({ label, value, tone = "slate", link, icon: Icon }: { label: string; value: number | string; tone?: string; link?: string; icon?: any }) {
+  const t = STAT_TONES[tone] || STAT_TONES.slate;
   const content = (
     <>
-      <div className="text-xs font-medium mb-1 text-slate-500">{label}</div>
-      <div className={`text-2xl font-semibold ${colors[tone] || colors.slate}`}>{value}</div>
+      <div className="flex items-start justify-between mb-2">
+        <div className="text-xs font-medium text-slate-500">{label}</div>
+        {Icon && (
+          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${t.chipBg}`}>
+            <Icon size={14} className={t.chipFg} />
+          </div>
+        )}
+      </div>
+      <div className={`text-2xl font-bold font-display ${t.text}`}>{value}</div>
     </>
   );
+  const base = `rounded-xl p-4 bg-white border border-slate-200 border-l-4 ${t.border}`;
   if (link) {
     return (
-      <Link href={link} className="rounded-lg p-4 bg-white border border-slate-200 block hover:shadow-sm hover:border-slate-300 transition">
+      <Link href={link} className={`${base} block hover:shadow-md hover:-translate-y-0.5 transition-all`}>
         {content}
       </Link>
     );
   }
-  return <div className="rounded-lg p-4 bg-white border border-slate-200">{content}</div>;
+  return <div className={base}>{content}</div>;
 }
 
 export function Btn({ children, onClick, variant = "primary", className = "", type = "button", disabled }: any) {
@@ -70,4 +88,25 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
       </div>
     </div>
   );
+}
+
+// Consistent color identity per lead status, reused anywhere a status name
+// needs a color dot (dashboard, reports) — so the same status always reads
+// the same color across the app.
+export function statusDotColor(status: string) {
+  const map: Record<string, string> = {
+    "New Lead": "bg-indigo-500",
+    "Contacted": "bg-sky-500",
+    "Interested": "bg-emerald-500",
+    "Call Later": "bg-amber-500",
+    "Will Visit Office": "bg-violet-500",
+    "Price Negotiation": "bg-amber-500",
+    "Waiting for Decision": "bg-amber-500",
+    "Documents Discussion": "bg-violet-500",
+    "Confirmed Client": "bg-emerald-600",
+    "Not Interested": "bg-rose-500",
+    "No Response": "bg-slate-400",
+    "Cancelled": "bg-slate-400",
+  };
+  return map[status] || "bg-slate-400";
 }

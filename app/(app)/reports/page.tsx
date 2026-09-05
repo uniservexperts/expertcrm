@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { todayStr, dayDiff, DOC_KEYS, LEAD_SOURCES } from "@/lib/types";
-import { StatCard } from "@/components/ui";
+import { StatCard, statusDotColor } from "@/components/ui";
+import { Users, CheckCircle2, XCircle, TrendingUp, CalendarClock, AlertTriangle, Clock, Briefcase, FileText, IndianRupee, ShieldAlert } from "lucide-react";
 
 const CLOSING_STATUSES = ["Not Interested"];
 
@@ -61,25 +62,25 @@ export default function ReportsPage() {
       <div>
         <div className="text-sm font-semibold mb-3 text-ink">Leads</div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <StatCard label="Total leads" value={leads.length} link="/leads" />
-          <StatCard label="Converted" value={convertedCount} tone="green" link="/leads?special=converted" />
-          <StatCard label="Closed (no follow-up)" value={closedCount} tone="red" link="/leads?special=closed" />
-          <StatCard label="Still active" value={activeCount} tone="blue" link="/leads?special=active" />
+          <StatCard label="Total leads" value={leads.length} link="/leads" icon={Users} />
+          <StatCard label="Converted" value={convertedCount} tone="green" link="/leads?special=converted" icon={CheckCircle2} />
+          <StatCard label="Closed (no follow-up)" value={closedCount} tone="red" link="/leads?special=closed" icon={XCircle} />
+          <StatCard label="Still active" value={activeCount} tone="blue" link="/leads?special=active" icon={TrendingUp} />
         </div>
         <div className={`grid ${isAdmin ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4`}>
           {isAdmin && <ReportTable title="By staff" rows={byStaff} />}
           <ReportTable title="By country" rows={byCountry} />
           <ReportTable title="By source" rows={bySource} />
-          <ReportTable title="By status" rows={byStatus} />
+          <ReportTable title="By status" rows={byStatus} dots />
         </div>
       </div>
 
       <div>
         <div className="text-sm font-semibold mb-3 text-ink">Follow-ups</div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Today" value={leads.filter((l) => l.next_followup_date === todayStr()).length} link="/followups" />
-          <StatCard label="Overdue" value={leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).length} tone="red" link="/followups" />
-          <StatCard label="Upcoming" value={leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) > 0).length} link="/followups" />
+          <StatCard label="Today" value={leads.filter((l) => l.next_followup_date === todayStr()).length} link="/followups" icon={CalendarClock} />
+          <StatCard label="Overdue" value={leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).length} tone="red" link="/followups" icon={AlertTriangle} />
+          <StatCard label="Upcoming" value={leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) > 0).length} link="/followups" icon={Clock} />
         </div>
       </div>
 
@@ -87,10 +88,10 @@ export default function ReportsPage() {
         <div>
           <div className="text-sm font-semibold mb-3 text-ink">Clients</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Active clients" value={clients.length} link="/clients" />
-            <StatCard label="Docs pending" value={clients.filter(docsPending).length} tone="brass" link="/clients" />
-            <StatCard label="Payments pending" value={clients.filter((c) => balance(c) > 0).length} tone="red" link="/clients" />
-            <StatCard label="Refund pending" value={clients.filter((c: any) => c.refunds?.[0]?.applicable && c.refunds?.[0]?.status !== "Paid").length} tone="red" link="/clients" />
+            <StatCard label="Active clients" value={clients.length} tone="violet" link="/clients" icon={Briefcase} />
+            <StatCard label="Docs pending" value={clients.filter(docsPending).length} tone="brass" link="/clients" icon={FileText} />
+            <StatCard label="Payments pending" value={clients.filter((c) => balance(c) > 0).length} tone="red" link="/clients" icon={IndianRupee} />
+            <StatCard label="Refund pending" value={clients.filter((c: any) => c.refunds?.[0]?.applicable && c.refunds?.[0]?.status !== "Paid").length} tone="red" link="/clients" icon={ShieldAlert} />
           </div>
         </div>
       )}
@@ -98,14 +99,18 @@ export default function ReportsPage() {
   );
 }
 
-function ReportTable({ title, rows }: { title: string; rows: { name: string; n: number; link?: string }[] }) {
+function ReportTable({ title, rows, dots }: { title: string; rows: { name: string; n: number; link?: string }[]; dots?: boolean }) {
   return (
     <div className="rounded-lg border border-slate-200 p-3 bg-white">
       <div className="text-xs font-medium mb-2 text-slate-500">{title}</div>
       {rows.map((r) =>
         r.link ? (
-          <Link key={r.name} href={r.link} className="flex justify-between text-sm py-1 hover:bg-slate-50 rounded px-1 -mx-1">
-            <span className="text-ink">{r.name}</span><span className="text-navy3 font-medium">{r.n}</span>
+          <Link key={r.name} href={r.link} className="flex justify-between items-center text-sm py-1 hover:bg-slate-50 rounded px-1 -mx-1">
+            <span className="text-ink flex items-center gap-2">
+              {dots && <span className={`w-2 h-2 rounded-full ${statusDotColor(r.name)}`} />}
+              {r.name}
+            </span>
+            <span className="text-navy3 font-medium">{r.n}</span>
           </Link>
         ) : (
           <div key={r.name} className="flex justify-between text-sm py-1"><span className="text-ink">{r.name}</span><span className="text-slate-400">{r.n}</span></div>

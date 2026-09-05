@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, Client, Profile, todayStr, toLocalDateStr, dayDiff, followUpLabel, followUpTone, DOC_KEYS } from "@/lib/types";
-import { StatCard, Badge } from "@/components/ui";
+import { StatCard, Badge, statusDotColor } from "@/components/ui";
+import { Inbox, CalendarClock, AlertTriangle, Clock, Briefcase, FileText, IndianRupee, BadgeCheck, XCircle, ShieldAlert } from "lucide-react";
 
 export default function DashboardPage() {
   const supabase = createClient();
@@ -54,24 +55,42 @@ export default function DashboardPage() {
   const docsPending = (c: any) => DOC_KEYS.some(([k]) => !c.client_documents?.find((d: any) => d.doc_key === k)?.received);
   const balance = (c: any) => c.total_fee - (c.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const firstName = me.full_name.split(" ")[0];
+  const dateLabel = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+  const insight =
+    overdue > 0 ? `${overdue} overdue follow-up${overdue > 1 ? "s" : ""} need attention first.` :
+    dueToday > 0 ? `${dueToday} follow-up${dueToday > 1 ? "s" : ""} due today.` :
+    "You're all caught up on follow-ups — nice work.";
+
   return (
     <div className="space-y-8">
+      <div className="rounded-2xl p-6 text-white" style={{ background: "linear-gradient(135deg, #141B2E 0%, #33409E 55%, #6D5BD0 100%)" }}>
+        <div className="text-sm text-white/70">{dateLabel}</div>
+        <div className="text-xl font-bold font-display mt-1">{greeting}, {firstName}</div>
+        <div className="text-sm text-white/90 mt-2">{insight}</div>
+      </div>
+
       <div>
         <div className="text-sm font-semibold mb-3 text-ink">Today</div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label={isAdmin ? "New leads" : "My new leads"} value={newLeads} tone="blue" link="/leads" />
-          <StatCard label="Follow-ups today" value={dueToday} tone="brass" link="/followups" />
-          <StatCard label="Overdue follow-ups" value={overdue} tone="red" link="/followups" />
-          <StatCard label="Upcoming follow-ups" value={upcoming} link="/followups" />
+          <StatCard label={isAdmin ? "New leads" : "My new leads"} value={newLeads} tone="blue" link="/leads" icon={Inbox} />
+          <StatCard label="Follow-ups today" value={dueToday} tone="brass" link="/followups" icon={CalendarClock} />
+          <StatCard label="Overdue follow-ups" value={overdue} tone="red" link="/followups" icon={AlertTriangle} />
+          <StatCard label="Upcoming follow-ups" value={upcoming} link="/followups" icon={Clock} />
         </div>
       </div>
 
       <div>
         <div className="text-sm font-semibold mb-3 text-ink">{isAdmin ? "All leads by status" : "My leads by status"}</div>
         <div className="rounded-lg border border-slate-200 bg-white p-2">
-          {statuses.map((s) => ({ name: s, n: leads.filter((l) => l.status === s).length })).filter((r) => r.n > 0).map((r, i) => (
+          {statuses.map((s) => ({ name: s, n: leads.filter((l) => l.status === s).length })).filter((r) => r.n > 0).map((r) => (
             <Link key={r.name} href={`/leads?status=${encodeURIComponent(r.name)}`} className="flex items-center justify-between px-3 py-2 border-b last:border-b-0 border-slate-100 hover:bg-slate-50">
-              <span className="text-sm text-ink"><span className="text-slate-400 mr-2">{i + 1}.</span>{r.name}</span>
+              <span className="text-sm text-ink flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${statusDotColor(r.name)}`} />
+                {r.name}
+              </span>
               <span className="text-sm font-semibold text-navy3">{r.n}</span>
             </Link>
           ))}
@@ -83,13 +102,13 @@ export default function DashboardPage() {
         <div>
           <div className="text-sm font-semibold mb-3 text-ink">Clients</div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Active clients" value={clients.length} tone="blue" link="/clients" />
-            <StatCard label="Documents pending" value={clients.filter(docsPending).length} tone="brass" link="/clients" />
-            <StatCard label="Payments pending" value={clients.filter((c) => balance(c) > 0).length} tone="red" link="/clients" />
-            <StatCard label="Pending with VFS" value={clients.filter((c) => c.visa_status === "Pending with VFS").length} link="/clients" />
-            <StatCard label="Approved" value={clients.filter((c) => c.visa_status === "Approved").length} tone="green" link="/clients" />
-            <StatCard label="Refused" value={clients.filter((c) => c.visa_status === "Refused").length} tone="red" link="/clients" />
-            <StatCard label="Refund pending" value={clients.filter((c: any) => c.refunds?.[0]?.applicable && c.refunds?.[0]?.status !== "Paid").length} tone="red" link="/clients" />
+            <StatCard label="Active clients" value={clients.length} tone="violet" link="/clients" icon={Briefcase} />
+            <StatCard label="Documents pending" value={clients.filter(docsPending).length} tone="brass" link="/clients" icon={FileText} />
+            <StatCard label="Payments pending" value={clients.filter((c) => balance(c) > 0).length} tone="red" link="/clients" icon={IndianRupee} />
+            <StatCard label="Pending with VFS" value={clients.filter((c) => c.visa_status === "Pending with VFS").length} link="/clients" icon={Clock} />
+            <StatCard label="Approved" value={clients.filter((c) => c.visa_status === "Approved").length} tone="green" link="/clients" icon={BadgeCheck} />
+            <StatCard label="Refused" value={clients.filter((c) => c.visa_status === "Refused").length} tone="red" link="/clients" icon={XCircle} />
+            <StatCard label="Refund pending" value={clients.filter((c: any) => c.refunds?.[0]?.applicable && c.refunds?.[0]?.status !== "Paid").length} tone="red" link="/clients" icon={ShieldAlert} />
           </div>
         </div>
       )}
