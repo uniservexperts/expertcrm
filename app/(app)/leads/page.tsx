@@ -3,7 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, Profile, followUpLabel, followUpTone, LEAD_SOURCES } from "@/lib/types";
+import { Lead, Profile, followUpLabel, followUpTone, LEAD_SOURCES, buildLatestNoteMap } from "@/lib/types";
 import { Badge, Btn, Field, Modal, inputCls } from "@/components/ui";
 
 const CLOSING_STATUSES = ["Not Interested"];
@@ -43,12 +43,8 @@ function LeadsPageInner() {
     const { data: leadRows } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
     setLeads(leadRows || []);
 
-    const { data: noteRows } = await supabase.from("lead_activities").select("lead_id, detail, created_at").eq("activity_type", "Note added").order("created_at", { ascending: false });
-    const noteMap: Record<string, string> = {};
-    (noteRows || []).forEach((r: any) => {
-      if (!(r.lead_id in noteMap) && r.detail && r.detail.trim()) noteMap[r.lead_id] = r.detail.trim();
-    });
-    setLatestNotes(noteMap);
+    const { data: noteRows } = await supabase.from("lead_activities").select("lead_id, activity_type, detail, created_at").in("activity_type", ["Note added", "Lead updated"]).order("created_at", { ascending: false });
+    setLatestNotes(buildLatestNoteMap(noteRows || []));
 
     if (profile?.role === "admin") {
       const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff").eq("active", true);

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, todayStr, dayDiff, followUpLabel, followUpTone } from "@/lib/types";
+import { Lead, todayStr, dayDiff, followUpLabel, followUpTone, buildLatestNoteMap } from "@/lib/types";
 import { Badge } from "@/components/ui";
 
 function addDays(dateStr: string, n: number) {
@@ -28,12 +28,8 @@ export default function FollowUpCenterPage() {
       setLeads(leadRows || []);
       const { data: completedActs } = await supabase.from("lead_activities").select("lead_id").eq("activity_type", "Follow-up completed");
       setActivityLeadIds(new Set((completedActs || []).map((a) => a.lead_id)));
-      const { data: noteRows } = await supabase.from("lead_activities").select("lead_id, detail, created_at").eq("activity_type", "Note added").order("created_at", { ascending: false });
-      const noteMap: Record<string, string> = {};
-      (noteRows || []).forEach((r: any) => {
-        if (!(r.lead_id in noteMap) && r.detail && r.detail.trim()) noteMap[r.lead_id] = r.detail.trim();
-      });
-      setLatestNotes(noteMap);
+      const { data: noteRows } = await supabase.from("lead_activities").select("lead_id, activity_type, detail, created_at").in("activity_type", ["Note added", "Lead updated"]).order("created_at", { ascending: false });
+      setLatestNotes(buildLatestNoteMap(noteRows || []));
       setLoading(false);
     })();
   }, []);

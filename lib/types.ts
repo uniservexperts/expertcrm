@@ -77,6 +77,24 @@ export function dayDiff(dateStr: string) {
   const b = new Date(dateStr + "T00:00:00");
   return Math.round((+b - +a) / 86400000);
 }
+// Builds a map of lead_id -> most recent call-note text, from activity rows
+// that are either a standalone "Note added" entry (older data) or a combined
+// "Lead updated" entry from the unified update form (which may or may not
+// include a note — only entries that actually contain one are used).
+export function buildLatestNoteMap(rows: { lead_id: string; activity_type: string; detail: string | null }[]) {
+  const map: Record<string, string> = {};
+  for (const r of rows) {
+    if (r.lead_id in map) continue;
+    if (r.activity_type === "Note added" && r.detail?.trim()) {
+      map[r.lead_id] = r.detail.trim();
+    } else if (r.activity_type === "Lead updated" && r.detail) {
+      const part = r.detail.split(" · ").find((p) => p.startsWith("Note: "));
+      if (part) map[r.lead_id] = part.slice("Note: ".length).trim();
+    }
+  }
+  return map;
+}
+
 export function fmtDate(dateStr: string | null) {
   if (!dateStr) return "—";
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
