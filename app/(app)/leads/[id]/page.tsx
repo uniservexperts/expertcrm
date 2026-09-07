@@ -15,6 +15,7 @@ export default function LeadDetailPage() {
   const [statuses, setStatuses] = useState<string[]>([]);
   const [staffOptions, setStaffOptions] = useState<Profile[]>([]);
   const [note, setNote] = useState("");
+  const [lastNoteText, setLastNoteText] = useState("");
   const [statusVal, setStatusVal] = useState("");
   const [fuDate, setFuDate] = useState("");
   const [fuType, setFuType] = useState("Call");
@@ -39,6 +40,10 @@ export default function LeadDetailPage() {
     setLocationVal(leadRow.location || "");
     const { data: acts } = await supabase.from("lead_activities").select("*").eq("lead_id", id).order("created_at");
     setActivities(acts || []);
+    const noteActs = (acts || []).filter((a) => a.activity_type === "Note added" && a.detail?.trim());
+    const latestNote = noteActs.length ? noteActs[noteActs.length - 1].detail.trim() : "";
+    setNote(latestNote);
+    setLastNoteText(latestNote);
     const { data: statusRows } = await supabase.from("lead_statuses").select("name").order("sort_order");
     setStatuses((statusRows || []).map((s) => s.name));
     if (profile?.role === "admin") {
@@ -53,34 +58,47 @@ export default function LeadDetailPage() {
     await supabase.from("lead_activities").insert({ lead_id: id, actor_id: me!.id, actor_name: me!.full_name, activity_type: type, detail });
   }
 
-  async function addNote() {
-    if (!note.trim()) return;
-    await logActivity("Note added", note.trim());
-    setNote(""); load();
-  }
   const CLOSING_STATUSES = ["Not Interested"];
-  async function changeStatus() {
-    if (!lead || statusVal === lead.status) return;
-    const isClosing = CLOSING_STATUSES.includes(statusVal);
-    const patch: any = { status: statusVal };
-    if (isClosing) {
-      patch.next_followup_date = null;
-      patch.next_followup_type = null;
-      patch.next_followup_note = null;
-      patch.next_followup_reminder = false;
+  async function saveUpdate() {
+    if (!lead) return;
+    const changes: string[] = [];
+    const patch: any = {};
+
+    const trimmedNote = note.trim();
+    const noteChanged = trimmedNote.length > 0 && trimmedNote !== lastNoteText.trim();
+    if (noteChanged) changes.push(`Note: ${trimmedNote}`);
+
+    const statusChanged = statusVal !== lead.status;
+    const willClose = CLOSING_STATUSES.includes(statusVal);
+    if (statusChanged) {
+      patch.status = statusVal;
+      changes.push(`Status: ${lead.status} → ${statusVal}`);
+      if (willClose) {
+        patch.next_followup_date = null;
+        patch.next_followup_type = null;
+        patch.next_followup_note = null;
+        patch.next_followup_reminder = false;
+        if (lead.next_followup_date) changes.push("Follow-up closed — no longer needed");
+      }
     }
-    await supabase.from("leads").update(patch).eq("id", id);
-    await logActivity("Status changed", `${lead.status} → ${statusVal}`);
-    if (isClosing && lead.next_followup_date) {
-      await logActivity("Follow-up closed", `Lead marked "${statusVal}" — no further follow-up needed`);
+
+    const fuNoteTrimmed = fuNote.trim();
+    const fuChanged = !willClose && !!fuDate && (fuDate !== lead.next_followup_date || fuType !== lead.next_followup_type || fuNoteTrimmed !== (lead.next_followup_note || ""));
+    if (fuChanged) {
+      patch.next_followup_date = fuDate;
+      patch.next_followup_type = fuType;
+      patch.next_followup_note = fuNoteTrimmed || null;
+      patch.next_followup_reminder = true;
+      changes.push(`Follow-up: ${fuType} on ${fmtDate(fuDate)}${fuNoteTrimmed ? " — " + fuNoteTrimmed : ""}`);
     }
+
+    if (!changes.length) return;
+    if (Object.keys(patch).length) {
+      await supabase.from("leads").update(patch).eq("id", id);
+    }
+    await logActivity("Lead updated", changes.join(" · "));
+    setFuNote("");
     load();
-  }
-  async function setFollowUp() {
-    if (!fuDate) return;
-    await supabase.from("leads").update({ next_followup_date: fuDate, next_followup_type: fuType, next_followup_note: fuNote, next_followup_reminder: true }).eq("id", id);
-    await logActivity("Follow-up scheduled", `${fuType} on ${fmtDate(fuDate)}${fuNote ? " — " + fuNote : ""}`);
-    setFuNote(""); load();
   }
   async function markCompleted() {
     if (!lead?.next_followup_date) return;
@@ -167,33 +185,34 @@ export default function LeadDetailPage() {
             )}
           </div>
 
-          <Field label="Add call note / feedback">
-            <textarea className={inputCls} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-          </Field>
-          <Btn variant="subtle" onClick={addNote}>Save note</Btn>
+          <div className="p-4 rounded-md border-2 border-navy3/20 bg-white space-y-3">
+            <div className="text-sm font-semibold text-ink">Update this lead</div>
 
-          <Field label="Update status">
-            <div className="flex gap-2">
+            <Field label={lastNoteText ? "Call note (last note shown below — edit it, or leave as is)" : "Call note"}>
+              <textarea className={inputCls} rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What did the client say?" />
+            </Field>
+
+            <Field label="Status">
               <select className={inputCls} value={statusVal} onChange={(e) => setStatusVal(e.target.value)}>
                 {statuses.map((s) => <option key={s}>{s}</option>)}
               </select>
-              <Btn variant="subtle" onClick={changeStatus}>Update</Btn>
-            </div>
-          </Field>
+            </Field>
 
-          {!CLOSING_STATUSES.includes(lead.status) && (
-            <div className="p-3 rounded-md bg-slate-100">
-              <div className="text-xs font-medium mb-2 text-slate-500">Schedule next follow-up</div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <input type="date" className={inputCls} value={fuDate} onChange={(e) => setFuDate(e.target.value)} />
-                <select className={inputCls} value={fuType} onChange={(e) => setFuType(e.target.value)}>
-                  {FOLLOWUP_TYPES.map((t) => <option key={t}>{t}</option>)}
-                </select>
+            {!CLOSING_STATUSES.includes(statusVal) && (
+              <div>
+                <div className="text-xs font-medium mb-2 text-slate-500">Next follow-up (shown below if one's already set — change it to reschedule, or leave as is)</div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <input type="date" className={inputCls} value={fuDate} onChange={(e) => setFuDate(e.target.value)} />
+                  <select className={inputCls} value={fuType} onChange={(e) => setFuType(e.target.value)}>
+                    {FOLLOWUP_TYPES.map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <input className={inputCls} placeholder="Follow-up note (optional)" value={fuNote} onChange={(e) => setFuNote(e.target.value)} />
               </div>
-              <input className={inputCls + " mb-2"} placeholder="Note" value={fuNote} onChange={(e) => setFuNote(e.target.value)} />
-              <Btn onClick={setFollowUp}>Save follow-up</Btn>
-            </div>
-          )}
+            )}
+
+            <Btn className="w-full justify-center" onClick={saveUpdate}>Save update</Btn>
+          </div>
 
           {isAdmin && (
             <Field label="Reassign staff">
