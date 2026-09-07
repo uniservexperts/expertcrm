@@ -27,6 +27,7 @@ function LeadsPageInner() {
   const [showNew, setShowNew] = useState(false);
   const [dup, setDup] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [latestNotes, setLatestNotes] = useState<Record<string, string>>({});
 
   const staffIdParam = searchParams.get("staffId");
   const countryIdParam = searchParams.get("countryId");
@@ -41,6 +42,14 @@ function LeadsPageInner() {
     setMe(profile);
     const { data: leadRows } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
     setLeads(leadRows || []);
+
+    const { data: noteRows } = await supabase.from("lead_activities").select("lead_id, detail, created_at").eq("activity_type", "Note added").order("created_at", { ascending: false });
+    const noteMap: Record<string, string> = {};
+    (noteRows || []).forEach((r: any) => {
+      if (!(r.lead_id in noteMap) && r.detail && r.detail.trim()) noteMap[r.lead_id] = r.detail.trim();
+    });
+    setLatestNotes(noteMap);
+
     if (profile?.role === "admin") {
       const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff").eq("active", true);
       setStaffOptions(staffRows || []);
@@ -130,6 +139,7 @@ function LeadsPageInner() {
             <thead><tr className="bg-slate-50">
               <th className="text-left px-4 py-2.5 font-medium text-slate-500">Lead</th>
               <th className="text-left px-4 py-2.5 font-medium text-slate-500">Status</th>
+              <th className="text-left px-4 py-2.5 font-medium text-slate-500">Last call note</th>
               {isAdmin && <th className="text-left px-4 py-2.5 font-medium text-slate-500">Assigned</th>}
               <th className="text-left px-4 py-2.5 font-medium text-slate-500">Next follow-up</th>
               <th></th>
@@ -139,6 +149,11 @@ function LeadsPageInner() {
                 <tr key={l.id} className="border-t border-slate-200">
                   <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div><div className="text-xs text-slate-400">{l.lead_code} · {l.mobile}</div></td>
                   <td className="px-4 py-2.5"><Badge>{l.status}</Badge></td>
+                  <td className="px-4 py-2.5 max-w-xs">
+                    <div className="text-xs text-slate-600 whitespace-normal break-words line-clamp-2">
+                      {latestNotes[l.id] || <span className="italic text-slate-400">No notes yet</span>}
+                    </div>
+                  </td>
                   {isAdmin && <td className="px-4 py-2.5">{staffMap[l.assigned_staff_id || ""] || "Unassigned"}</td>}
                   <td className="px-4 py-2.5"><Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge></td>
                   <td className="px-4 py-2.5 text-right"><Link href={`/leads/${l.id}`} className="text-xs font-medium text-navy3">Open →</Link></td>
