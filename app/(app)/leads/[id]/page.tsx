@@ -25,6 +25,8 @@ export default function LeadDetailPage() {
   const [editingDetails, setEditingDetails] = useState(false);
   const [nameVal, setNameVal] = useState("");
   const [locationVal, setLocationVal] = useState("");
+  const [countryVal, setCountryVal] = useState<number | "">("");
+  const [countries, setCountries] = useState<{ id: number; name: string }[]>([]);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -38,6 +40,9 @@ export default function LeadDetailPage() {
     setFuDate(leadRow.next_followup_date || "");
     setNameVal(leadRow.name || "");
     setLocationVal(leadRow.location || "");
+    setCountryVal(leadRow.country_id || "");
+    const { data: countryRows } = await supabase.from("countries").select("*").order("name");
+    setCountries(countryRows || []);
     const { data: acts } = await supabase.from("lead_activities").select("*").eq("lead_id", id).order("created_at");
     setActivities(acts || []);
     const noteActs = (acts || []).filter((a) => a.activity_type === "Note added" && a.detail?.trim());
@@ -119,13 +124,19 @@ export default function LeadDetailPage() {
     if (!lead) return;
     const oldName = lead.name?.trim() || "(no name)";
     const oldLocation = lead.location?.trim() || "(no location)";
+    const oldCountryName = countries.find((c) => c.id === lead.country_id)?.name || "(none)";
     const newName = nameVal.trim();
     const newLocation = locationVal.trim();
-    if (newName === (lead.name || "") && newLocation === (lead.location || "")) { setEditingDetails(false); return; }
-    await supabase.from("leads").update({ name: newName, location: newLocation || null }).eq("id", id);
+    const newCountryName = countries.find((c) => c.id === countryVal)?.name || "(none)";
+    const nameChanged = newName !== (lead.name || "");
+    const locationChanged = newLocation !== (lead.location || "");
+    const countryChanged = countryVal !== lead.country_id;
+    if (!nameChanged && !locationChanged && !countryChanged) { setEditingDetails(false); return; }
+    await supabase.from("leads").update({ name: newName, location: newLocation || null, country_id: countryVal || null }).eq("id", id);
     const changes: string[] = [];
-    if (newName !== (lead.name || "")) changes.push(`Name: ${oldName} → ${newName || "(no name)"}`);
-    if (newLocation !== (lead.location || "")) changes.push(`Location: ${oldLocation} → ${newLocation || "(no location)"}`);
+    if (nameChanged) changes.push(`Name: ${oldName} → ${newName || "(no name)"}`);
+    if (locationChanged) changes.push(`Location: ${oldLocation} → ${newLocation || "(no location)"}`);
+    if (countryChanged) changes.push(`Country: ${oldCountryName} → ${newCountryName}`);
     await logActivity("Details updated", changes.join(" · "));
     setEditingDetails(false);
     load();
@@ -151,10 +162,11 @@ export default function LeadDetailPage() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><div className="text-xs text-slate-400">Mobile</div><div>{lead.mobile}</div></div>
               <div><div className="text-xs text-slate-400">Location</div><div>{lead.location || "—"}</div></div>
+              <div><div className="text-xs text-slate-400">Country</div><div>{countries.find((c) => c.id === lead.country_id)?.name || "—"}</div></div>
               <div><div className="text-xs text-slate-400">Source</div><div>{lead.source || "—"}</div></div>
               <div><div className="text-xs text-slate-400">Created</div><div>{fmtDate(toLocalDateStr(lead.created_at))}</div></div>
               <div className="col-span-2">
-                <Btn variant="ghost" onClick={() => setEditingDetails(true)}>Edit name / location</Btn>
+                <Btn variant="ghost" onClick={() => setEditingDetails(true)}>Edit name / location / country</Btn>
               </div>
             </div>
           ) : (
@@ -165,9 +177,14 @@ export default function LeadDetailPage() {
               <Field label="Location">
                 <input className={inputCls} value={locationVal} onChange={(e) => setLocationVal(e.target.value)} placeholder="e.g. Hyderabad" />
               </Field>
+              <Field label="Country">
+                <select className={inputCls} value={countryVal} onChange={(e) => setCountryVal(Number(e.target.value))}>
+                  {countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </Field>
               <div className="flex gap-2 pt-1">
                 <Btn onClick={saveDetails}>Save</Btn>
-                <Btn variant="ghost" onClick={() => { setNameVal(lead.name || ""); setLocationVal(lead.location || ""); setEditingDetails(false); }}>Cancel</Btn>
+                <Btn variant="ghost" onClick={() => { setNameVal(lead.name || ""); setLocationVal(lead.location || ""); setCountryVal(lead.country_id || ""); setEditingDetails(false); }}>Cancel</Btn>
               </div>
             </div>
           )}

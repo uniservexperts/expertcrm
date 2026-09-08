@@ -68,6 +68,7 @@ export default function FollowUpCenterPage() {
           <table className="w-full text-sm">
             <thead><tr className="bg-slate-50">
               <th className="text-left px-4 py-2.5 font-medium text-slate-500">Lead</th>
+              <th className="text-left px-4 py-2.5 font-medium text-slate-500">Location</th>
               <th className="text-left px-4 py-2.5 font-medium text-slate-500">Status</th>
               <th className="text-left px-4 py-2.5 font-medium text-slate-500">Last call note</th>
               <th className="text-left px-4 py-2.5 font-medium text-slate-500">Follow-up</th>
@@ -77,6 +78,7 @@ export default function FollowUpCenterPage() {
               {buckets[tab].map((l) => (
                 <tr key={l.id} className="border-t border-slate-200">
                   <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div><div className="text-xs text-slate-400">{l.lead_code} · {l.mobile}</div></td>
+                  <td className="px-4 py-2.5 text-slate-600">{l.location || <span className="text-slate-300">—</span>}</td>
                   <td className="px-4 py-2.5"><Badge>{l.status}</Badge></td>
                   <td className="px-4 py-2.5 max-w-xs">
                     <div className="text-xs text-slate-600 whitespace-normal break-words line-clamp-2">
