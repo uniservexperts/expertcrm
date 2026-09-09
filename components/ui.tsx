@@ -1,6 +1,7 @@
 "use client";
 import { ReactNode } from "react";
 import Link from "next/link";
+import { Phone } from "lucide-react";
 
 const TONES: Record<string, string> = {
   slate: "bg-slate-100 text-slate-600",
@@ -109,4 +110,21 @@ export function statusDotColor(status: string) {
     "Cancelled": "bg-slate-400",
   };
   return map[status] || "bg-slate-400";
+}
+
+// Tap-to-call phone number. Always stop propagation — this is often placed
+// inside a clickable row/card, and we don't want tapping the number to also
+// trigger navigating into that row.
+export function PhoneLink({ number, className = "" }: { number: string; className?: string }) {
+  if (!number) return null;
+  return (
+    <a
+      href={`tel:${number}`}
+      onClick={(e) => e.stopPropagation()}
+      className={`inline-flex items-center gap-1 text-navy3 hover:underline ${className}`}
+    >
+      <Phone size={12} className="flex-shrink-0" />
+      {number}
+    </a>
+  );
 }

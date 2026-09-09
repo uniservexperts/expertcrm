@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, LeadActivity, Profile, fmtDate, toLocalDateStr, followUpLabel, followUpTone, FOLLOWUP_TYPES } from "@/lib/types";
-import { Badge, Btn, Field, inputCls, Modal } from "@/components/ui";
+import { Badge, Btn, Field, inputCls, Modal, PhoneLink } from "@/components/ui";
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -160,7 +160,7 @@ export default function LeadDetailPage() {
         <div className="space-y-4">
           {!editingDetails ? (
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><div className="text-xs text-slate-400">Mobile</div><div>{lead.mobile}</div></div>
+              <div><div className="text-xs text-slate-400">Mobile</div><PhoneLink number={lead.mobile} className="text-sm" /></div>
               <div><div className="text-xs text-slate-400">Location</div><div>{lead.location || "—"}</div></div>
               <div><div className="text-xs text-slate-400">Country</div><div>{countries.find((c) => c.id === lead.country_id)?.name || "—"}</div></div>
               <div><div className="text-xs text-slate-400">Source</div><div>{lead.source || "—"}</div></div>

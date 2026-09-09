@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, Client, Profile, todayStr, toLocalDateStr, dayDiff, followUpLabel, followUpTone, DOC_KEYS } from "@/lib/types";
-import { StatCard, Badge, statusDotColor } from "@/components/ui";
+import { StatCard, Badge, statusDotColor, PhoneLink } from "@/components/ui";
 import { Inbox, CalendarClock, AlertTriangle, Clock, Briefcase, FileText, IndianRupee, BadgeCheck, XCircle, ShieldAlert } from "lucide-react";
 
 export default function DashboardPage() {
@@ -198,17 +199,18 @@ export default function DashboardPage() {
 }
 
 function MiniList({ leads, empty }: { leads: Lead[]; empty: string }) {
+  const router = useRouter();
   if (!leads.length) return <div className="text-sm p-4 rounded-lg bg-white border border-slate-200 text-slate-400">{empty}</div>;
   return (
     <div className="rounded-lg border border-slate-200 divide-y bg-white">
       {leads.map((l) => (
-        <Link key={l.id} href={`/leads/${l.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
+        <div key={l.id} onClick={() => router.push(`/leads/${l.id}`)} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 cursor-pointer">
           <div>
             <div className="text-sm font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div>
-            <div className="text-xs text-slate-400">{l.mobile}</div>
+            <div className="text-xs text-slate-400"><PhoneLink number={l.mobile} /></div>
           </div>
           <Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge>
-        </Link>
+        </div>
       ))}
     </div>
   );

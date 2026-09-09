@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DOC_KEYS, fmtDate, todayStr } from "@/lib/types";
-import { Badge, Btn, Field, inputCls } from "@/components/ui";
+import { Badge, Btn, Field, inputCls, PhoneLink } from "@/components/ui";
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -74,7 +74,7 @@ export default function ClientDetailPage() {
       <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><div className="text-xs text-slate-400">Mobile</div><div>{client.mobile}</div></div>
+            <div><div className="text-xs text-slate-400">Mobile</div><PhoneLink number={client.mobile} className="text-sm" /></div>
             <div><div className="text-xs text-slate-400">Converted</div><div>{fmtDate(client.conversion_date)}</div></div>
           </div>
 

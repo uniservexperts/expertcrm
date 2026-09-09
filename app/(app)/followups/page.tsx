@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, todayStr, dayDiff, followUpLabel, followUpTone, buildLatestNoteMap } from "@/lib/types";
-import { Badge } from "@/components/ui";
+import { Badge, PhoneLink } from "@/components/ui";
 
 function addDays(dateStr: string, n: number) {
   const d = new Date(dateStr + "T00:00:00");
@@ -77,7 +77,7 @@ export default function FollowUpCenterPage() {
             <tbody>
               {buckets[tab].map((l) => (
                 <tr key={l.id} className="border-t border-slate-200">
-                  <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div><div className="text-xs text-slate-400">{l.lead_code} · {l.mobile}</div></td>
+                  <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div><div className="text-xs text-slate-400 flex items-center gap-1">{l.lead_code} · <PhoneLink number={l.mobile} /></div></td>
                   <td className="px-4 py-2.5 text-slate-600">{l.location || <span className="text-slate-300">—</span>}</td>
                   <td className="px-4 py-2.5"><Badge>{l.status}</Badge></td>
                   <td className="px-4 py-2.5 max-w-xs">
