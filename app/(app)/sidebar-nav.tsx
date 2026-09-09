@@ -25,6 +25,7 @@ export default function SidebarNav({ profile }: { profile: { full_name: string; 
         ["/leads", "My Leads", ClipboardList],
         ["/followups", "Follow-up Center", Calendar],
         ["/reports", "My Reports", FileText],
+        ["/settings", "Settings", Settings],
       ];
 
   async function signOut() {
