@@ -218,7 +218,7 @@ export default function LeadDetailPage() {
             {!CLOSING_STATUSES.includes(statusVal) && (
               <div>
                 <div className="text-xs font-medium mb-2 text-slate-500">Next follow-up (shown below if one's already set — change it to reschedule, or leave as is)</div>
-                <div className="grid grid-cols-2 gap-2 mb-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                   <input type="date" className={inputCls} value={fuDate} onChange={(e) => setFuDate(e.target.value)} />
                   <select className={inputCls} value={fuType} onChange={(e) => setFuType(e.target.value)}>
                     {FOLLOWUP_TYPES.map((t) => <option key={t}>{t}</option>)}

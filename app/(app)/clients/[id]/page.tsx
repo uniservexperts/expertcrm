@@ -121,7 +121,7 @@ export default function ClientDetailPage() {
             </Field>
             <div className="text-sm mb-2 flex justify-between"><span className="text-slate-500">Paid</span><span>₹{paid.toLocaleString("en-IN")}</span></div>
             <div className="text-sm mb-3 flex justify-between font-medium"><span className="text-slate-500">Balance</span><span className={balance > 0 ? "text-red-600" : "text-emerald-600"}>₹{balance.toLocaleString("en-IN")}</span></div>
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
               <input type="number" placeholder="Amount" className={inputCls} value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
               <input placeholder="Remarks" className={inputCls} value={payRemark} onChange={(e) => setPayRemark(e.target.value)} />
             </div>
@@ -130,7 +130,7 @@ export default function ClientDetailPage() {
 
           <div>
             <div className="text-xs font-medium mb-2 text-slate-500">SLOT / APPOINTMENT</div>
-            <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
               <input type="date" className={inputCls} value={slot?.slot_date || ""} onChange={(e) => saveSlot({ slot_date: e.target.value })} />
               <input type="time" className={inputCls} value={slot?.slot_time || ""} onChange={(e) => saveSlot({ slot_time: e.target.value })} />
             </div>

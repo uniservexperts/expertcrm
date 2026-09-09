@@ -117,7 +117,7 @@ export default function DashboardPage() {
       {isAdmin && (
         <div>
           <div className="text-sm font-semibold mb-3 text-ink">Staff</div>
-          <div className="rounded-lg overflow-hidden border border-slate-200 bg-white">
+          <div className="rounded-lg overflow-x-auto border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50">
                 <th className="text-left px-4 py-2 font-medium text-slate-500">Staff</th>
@@ -144,7 +144,7 @@ export default function DashboardPage() {
       {isAdmin && (
         <div>
           <div className="text-sm font-semibold mb-3 text-ink">Staff activity today</div>
-          <div className="rounded-lg overflow-hidden border border-slate-200 bg-white">
+          <div className="rounded-lg overflow-x-auto border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50">
                 <th className="text-left px-4 py-2 font-medium text-slate-500">Staff</th>

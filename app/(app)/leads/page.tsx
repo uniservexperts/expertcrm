@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, Profile, followUpLabel, followUpTone, LEAD_SOURCES, buildLatestNoteMap } from "@/lib/types";
 import { Badge, Btn, Field, Modal, inputCls, PhoneLink } from "@/components/ui";
@@ -18,6 +18,7 @@ export default function LeadsPage() {
 
 function LeadsPageInner() {
   const supabase = createClient();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [me, setMe] = useState<Profile | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -108,10 +109,10 @@ function LeadsPageInner() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-lg font-semibold text-ink">{isAdmin ? "All leads" : "My leads"}</h2>
         <div className="flex gap-2">
-          <select className="border border-slate-200 rounded-md px-2.5 py-1.5 text-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select className="border border-slate-200 rounded-md px-2.5 py-1.5 text-sm flex-1 sm:flex-none" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">All statuses</option>
             {statuses.map((s) => <option key={s}>{s}</option>)}
           </select>
@@ -130,36 +131,61 @@ function LeadsPageInner() {
       {!filtered.length ? (
         <div className="text-sm p-6 text-center rounded-lg bg-white border border-slate-200 text-slate-400">No leads found.</div>
       ) : (
-        <div className="rounded-lg border border-slate-200 overflow-hidden bg-white">
-          <table className="w-full text-sm">
-            <thead><tr className="bg-slate-50">
-              <th className="text-left px-4 py-2.5 font-medium text-slate-500">Lead</th>
-              <th className="text-left px-4 py-2.5 font-medium text-slate-500">Location</th>
-              <th className="text-left px-4 py-2.5 font-medium text-slate-500">Status</th>
-              <th className="text-left px-4 py-2.5 font-medium text-slate-500">Last call note</th>
-              {isAdmin && <th className="text-left px-4 py-2.5 font-medium text-slate-500">Assigned</th>}
-              <th className="text-left px-4 py-2.5 font-medium text-slate-500">Next follow-up</th>
-              <th></th>
-            </tr></thead>
-            <tbody>
-              {filtered.map((l) => (
-                <tr key={l.id} className="border-t border-slate-200">
-                  <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div><div className="text-xs text-slate-400 flex items-center gap-1">{l.lead_code} · <PhoneLink number={l.mobile} /></div></td>
-                  <td className="px-4 py-2.5 text-slate-600">{l.location || <span className="text-slate-300">—</span>}</td>
-                  <td className="px-4 py-2.5"><Badge>{l.status}</Badge></td>
-                  <td className="px-4 py-2.5 max-w-xs">
-                    <div className="text-xs text-slate-600 whitespace-normal break-words line-clamp-2">
-                      {latestNotes[l.id] || <span className="italic text-slate-400">No notes yet</span>}
-                    </div>
-                  </td>
-                  {isAdmin && <td className="px-4 py-2.5">{staffMap[l.assigned_staff_id || ""] || "Unassigned"}</td>}
-                  <td className="px-4 py-2.5"><Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge></td>
-                  <td className="px-4 py-2.5 text-right"><Link href={`/leads/${l.id}`} className="text-xs font-medium text-navy3">Open →</Link></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Desktop/tablet: table */}
+          <div className="hidden md:block rounded-lg border border-slate-200 overflow-hidden bg-white">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-slate-50">
+                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Lead</th>
+                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Location</th>
+                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Status</th>
+                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Last call note</th>
+                {isAdmin && <th className="text-left px-4 py-2.5 font-medium text-slate-500">Assigned</th>}
+                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Next follow-up</th>
+                <th></th>
+              </tr></thead>
+              <tbody>
+                {filtered.map((l) => (
+                  <tr key={l.id} className="border-t border-slate-200">
+                    <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div><div className="text-xs text-slate-400 flex items-center gap-1">{l.lead_code} · <PhoneLink number={l.mobile} /></div></td>
+                    <td className="px-4 py-2.5 text-slate-600">{l.location || <span className="text-slate-300">—</span>}</td>
+                    <td className="px-4 py-2.5"><Badge>{l.status}</Badge></td>
+                    <td className="px-4 py-2.5 max-w-xs">
+                      <div className="text-xs text-slate-600 whitespace-normal break-words line-clamp-2">
+                        {latestNotes[l.id] || <span className="italic text-slate-400">No notes yet</span>}
+                      </div>
+                    </td>
+                    {isAdmin && <td className="px-4 py-2.5">{staffMap[l.assigned_staff_id || ""] || "Unassigned"}</td>}
+                    <td className="px-4 py-2.5"><Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge></td>
+                    <td className="px-4 py-2.5 text-right"><Link href={`/leads/${l.id}`} className="text-xs font-medium text-navy3">Open →</Link></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: stacked cards, easier to tap and scan than a squeezed table */}
+          <div className="md:hidden space-y-2">
+            {filtered.map((l) => (
+              <div key={l.id} onClick={() => router.push(`/leads/${l.id}`)}
+                className="rounded-lg border border-slate-200 bg-white p-4 active:bg-slate-50">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div>
+                  <Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge>
+                </div>
+                <div className="text-xs text-slate-400 mb-2 flex items-center gap-1">{l.lead_code} · <PhoneLink number={l.mobile} /></div>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <Badge>{l.status}</Badge>
+                  {l.location && <span className="text-xs text-slate-500">{l.location}</span>}
+                  {isAdmin && <span className="text-xs text-slate-400">· {staffMap[l.assigned_staff_id || ""] || "Unassigned"}</span>}
+                </div>
+                <div className="text-xs text-slate-600 whitespace-normal break-words line-clamp-2">
+                  {latestNotes[l.id] || <span className="italic text-slate-400">No notes yet</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {showNew && (
