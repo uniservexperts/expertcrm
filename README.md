@@ -161,3 +161,10 @@ in one and a Staff member in the other, and verify:
   Excel import, etc.) was intentionally left out of this MVP, as requested —
   the schema and route structure were built so those can be added later
   without a rebuild.
+
+---
+
+## Optional database upgrades (run once in Supabase → SQL Editor)
+
+- `supabase/add_last_activity.sql` — adds a "last updated" timestamp to leads so the
+  Leads list can sort recently-updated leads to the top.

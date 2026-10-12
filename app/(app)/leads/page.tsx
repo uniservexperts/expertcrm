@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, Profile, followUpLabel, followUpTone, LEAD_SOURCES, buildLatestNoteMap } from "@/lib/types";
 import { Badge, Btn, Field, Modal, inputCls, PhoneLink } from "@/components/ui";
+import { fetchAllRows } from "@/lib/fetchAll";
+import { Search, X } from "lucide-react";
 
 const CLOSING_STATUSES = ["Not Interested"];
 
@@ -29,6 +31,8 @@ function LeadsPageInner() {
   const [dup, setDup] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [latestNotes, setLatestNotes] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("updated");
 
   const staffIdParam = searchParams.get("staffId");
   const countryIdParam = searchParams.get("countryId");
@@ -41,11 +45,13 @@ function LeadsPageInner() {
     if (!user) return;
     const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
     setMe(profile);
-    const { data: leadRows } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
-    setLeads(leadRows || []);
+    const leadRows = await fetchAllRows<Lead>((from, to) =>
+      supabase.from("leads").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
+    setLeads(leadRows);
 
-    const { data: noteRows } = await supabase.from("lead_activities").select("lead_id, activity_type, detail, created_at").in("activity_type", ["Note added", "Lead updated"]).order("created_at", { ascending: false });
-    setLatestNotes(buildLatestNoteMap(noteRows || []));
+    const noteRows = await fetchAllRows<any>((from, to) =>
+      supabase.from("lead_activities").select("lead_id, activity_type, detail, created_at").in("activity_type", ["Note added", "Lead updated"]).order("created_at", { ascending: false }).order("id").range(from, to));
+    setLatestNotes(buildLatestNoteMap(noteRows));
 
     if (profile?.role === "admin") {
       const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff").eq("active", true);
@@ -69,6 +75,43 @@ function LeadsPageInner() {
   if (specialParam === "converted") filtered = filtered.filter((l) => l.converted);
   if (specialParam === "closed") filtered = filtered.filter((l) => CLOSING_STATUSES.includes(l.status));
   if (specialParam === "active") filtered = filtered.filter((l) => !l.converted && !CLOSING_STATUSES.includes(l.status));
+
+  // Search: name, mobile (digits-insensitive), lead ID, location, last call note
+  const q = search.trim().toLowerCase();
+  const qDigits = q.replace(/\D/g, "");
+  if (q) {
+    filtered = filtered.filter((l) =>
+      (l.name || "").toLowerCase().includes(q) ||
+      l.lead_code.toLowerCase().includes(q) ||
+      (l.location || "").toLowerCase().includes(q) ||
+      (latestNotes[l.id] || "").toLowerCase().includes(q) ||
+      l.mobile.toLowerCase().includes(q) ||
+      (qDigits.length >= 3 && l.mobile.replace(/\D/g, "").includes(qDigits))
+    );
+  }
+
+  // Sort (default: most recently updated first)
+  const touched = (l: Lead) => new Date(l.last_activity_at || l.created_at).getTime();
+  filtered = [...filtered].sort((a, b) => {
+    switch (sortBy) {
+      case "created_desc": return +new Date(b.created_at) - +new Date(a.created_at);
+      case "created_asc": return +new Date(a.created_at) - +new Date(b.created_at);
+      case "name": {
+        const an = (a.name || "").trim(), bn = (b.name || "").trim();
+        if (!an && !bn) return 0;
+        if (!an) return 1;
+        if (!bn) return -1;
+        return an.localeCompare(bn, undefined, { sensitivity: "base" });
+      }
+      case "followup": {
+        if (!a.next_followup_date && !b.next_followup_date) return touched(b) - touched(a);
+        if (!a.next_followup_date) return 1;
+        if (!b.next_followup_date) return -1;
+        return a.next_followup_date.localeCompare(b.next_followup_date);
+      }
+      default: return touched(b) - touched(a);
+    }
+  });
 
   const filterLabels: string[] = [];
   if (staffIdParam) filterLabels.push(`Staff: ${staffMap[staffIdParam] || staffIdParam}`);
@@ -118,6 +161,39 @@ function LeadsPageInner() {
           </select>
           <Btn onClick={() => setShowNew(true)}>+ New lead</Btn>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row mb-3">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, mobile, lead ID, location or note"
+            className="w-full border border-slate-200 rounded-md pl-9 pr-9 py-2 text-sm outline-none focus:ring-2 focus:ring-navy3 bg-white"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          aria-label="Sort leads"
+          className="border border-slate-200 rounded-md px-2.5 py-2 text-sm bg-white sm:w-56"
+        >
+          <option value="updated">Sort: Recently updated</option>
+          <option value="created_desc">Sort: Newest added</option>
+          <option value="created_asc">Sort: Oldest added</option>
+          <option value="followup">Sort: Follow-up date (soonest)</option>
+          <option value="name">Sort: Name A–Z</option>
+        </select>
+      </div>
+      <div className="text-xs text-slate-400 mb-3">
+        {filtered.length === leads.length ? `${leads.length} leads` : `Showing ${filtered.length} of ${leads.length} leads`}
       </div>
 
       {hasUrlFilter && (

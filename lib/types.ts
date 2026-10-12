@@ -17,6 +17,7 @@ export type Lead = {
   next_followup_note: string | null;
   converted: boolean;
   client_id: string | null;
+  last_activity_at?: string | null;
 };
 
 export type LeadActivity = {
