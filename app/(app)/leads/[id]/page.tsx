@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, LeadActivity, Profile, fmtDate, toLocalDateStr, followUpLabel, followUpTone, FOLLOWUP_TYPES } from "@/lib/types";
+import { Lead, LeadActivity, Profile, fmtDate, toLocalDateStr, followUpLabel, followUpTone, FOLLOWUP_TYPES, LEAD_SOURCES } from "@/lib/types";
 import { Badge, Btn, Field, inputCls, Modal, PhoneLink } from "@/components/ui";
 
 export default function LeadDetailPage() {
@@ -26,6 +26,7 @@ export default function LeadDetailPage() {
   const [nameVal, setNameVal] = useState("");
   const [locationVal, setLocationVal] = useState("");
   const [countryVal, setCountryVal] = useState<number | "">("");
+  const [sourceVal, setSourceVal] = useState("");
   const [countries, setCountries] = useState<{ id: number; name: string }[]>([]);
 
   async function load() {
@@ -41,6 +42,7 @@ export default function LeadDetailPage() {
     setNameVal(leadRow.name || "");
     setLocationVal(leadRow.location || "");
     setCountryVal(leadRow.country_id || "");
+    setSourceVal(leadRow.source || "");
     const { data: countryRows } = await supabase.from("countries").select("*").order("name");
     setCountries(countryRows || []);
     const { data: acts } = await supabase.from("lead_activities").select("*").eq("lead_id", id).order("created_at");
@@ -131,12 +133,14 @@ export default function LeadDetailPage() {
     const nameChanged = newName !== (lead.name || "");
     const locationChanged = newLocation !== (lead.location || "");
     const countryChanged = countryVal !== lead.country_id;
-    if (!nameChanged && !locationChanged && !countryChanged) { setEditingDetails(false); return; }
-    await supabase.from("leads").update({ name: newName, location: newLocation || null, country_id: countryVal || null }).eq("id", id);
+    const sourceChanged = sourceVal !== (lead.source || "");
+    if (!nameChanged && !locationChanged && !countryChanged && !sourceChanged) { setEditingDetails(false); return; }
+    await supabase.from("leads").update({ name: newName, location: newLocation || null, country_id: countryVal || null, source: sourceVal || null }).eq("id", id);
     const changes: string[] = [];
     if (nameChanged) changes.push(`Name: ${oldName} → ${newName || "(no name)"}`);
     if (locationChanged) changes.push(`Location: ${oldLocation} → ${newLocation || "(no location)"}`);
     if (countryChanged) changes.push(`Country: ${oldCountryName} → ${newCountryName}`);
+    if (sourceChanged) changes.push(`Source: ${lead.source || "(none)"} → ${sourceVal || "(none)"}`);
     await logActivity("Details updated", changes.join(" · "));
     setEditingDetails(false);
     load();
@@ -166,7 +170,7 @@ export default function LeadDetailPage() {
               <div><div className="text-xs text-slate-400">Source</div><div>{lead.source || "—"}</div></div>
               <div><div className="text-xs text-slate-400">Created</div><div>{fmtDate(toLocalDateStr(lead.created_at))}</div></div>
               <div className="col-span-2">
-                <Btn variant="ghost" onClick={() => setEditingDetails(true)}>Edit name / location / country</Btn>
+                <Btn variant="ghost" onClick={() => setEditingDetails(true)}>Edit name / location / country / source</Btn>
               </div>
             </div>
           ) : (
@@ -182,9 +186,15 @@ export default function LeadDetailPage() {
                   {countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </Field>
+              <Field label="Lead source">
+                <select className={inputCls} value={sourceVal} onChange={(e) => setSourceVal(e.target.value)}>
+                  <option value="">Not set</option>
+                  {[...LEAD_SOURCES, ...(lead.source && !LEAD_SOURCES.includes(lead.source) ? [lead.source] : [])].map((src) => <option key={src} value={src}>{src}</option>)}
+                </select>
+              </Field>
               <div className="flex gap-2 pt-1">
                 <Btn onClick={saveDetails}>Save</Btn>
-                <Btn variant="ghost" onClick={() => { setNameVal(lead.name || ""); setLocationVal(lead.location || ""); setCountryVal(lead.country_id || ""); setEditingDetails(false); }}>Cancel</Btn>
+                <Btn variant="ghost" onClick={() => { setNameVal(lead.name || ""); setLocationVal(lead.location || ""); setCountryVal(lead.country_id || ""); setSourceVal(lead.source || ""); setEditingDetails(false); }}>Cancel</Btn>
               </div>
             </div>
           )}
