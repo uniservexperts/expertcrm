@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, todayStr, dayDiff, followUpLabel, followUpTone, buildLatestNoteMap } from "@/lib/types";
-import { Badge, PhoneLink } from "@/components/ui";
+import { Lead, Profile, Scope, inScope, todayStr, dayDiff, followUpLabel, followUpTone, buildLatestNoteMap } from "@/lib/types";
+import { Badge, PhoneLink, ScopeToggle } from "@/components/ui";
+import { useScope } from "@/lib/useScope";
+import { useTeamSharing } from "@/lib/useTeamSharing";
 
 function addDays(dateStr: string, n: number) {
   const d = new Date(dateStr + "T00:00:00");
@@ -23,9 +25,20 @@ export default function FollowUpCenterPage() {
   const [latestNotes, setLatestNotes] = useState<Record<string, string>>({});
   const [tab, setTab] = useState("today");
   const [loading, setLoading] = useState(true);
+  const [me, setMe] = useState<Profile | null>(null);
+  const [allStaff, setAllStaff] = useState<Profile[]>([]);
+  const sharing = useTeamSharing();
+  const [scope, setScope] = useScope();
 
   useEffect(() => {
     (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        setMe(profile);
+      }
+      const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff");
+      setAllStaff(staffRows || []);
       const { data: leadRows } = await supabase.from("leads").select("*").order("next_followup_date");
       setLeads(leadRows || []);
       const { data: completedActs } = await supabase.from("lead_activities").select("lead_id").eq("activity_type", "Follow-up completed");
@@ -42,19 +55,33 @@ export default function FollowUpCenterPage() {
   const tomorrow = addDays(today, 1);
   const CLOSING_STATUSES = ["Not Interested"];
   const isClosed = (l: Lead) => CLOSING_STATUSES.includes(l.status);
+  const isAdmin = me?.role === "admin";
+  // Staff see their own follow-ups by default; with team sharing on they can switch to colleagues'
+  const effectiveScope: Scope = isAdmin ? "all" : sharing ? scope : "mine";
+  const scoped = me ? leads.filter((l) => inScope(l.assigned_staff_id, effectiveScope, me.id)) : leads;
+  const showAssigned = isAdmin || (sharing && effectiveScope !== "mine");
+  const staffName = (id: string | null) => allStaff.find((s) => s.id === id)?.full_name || "Unassigned";
   const buckets: Record<string, Lead[]> = {
-    today: leads.filter((l) => l.next_followup_date === today),
-    tomorrow: leads.filter((l) => l.next_followup_date === tomorrow),
-    upcoming: leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) > 1),
-    overdue: leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0),
-    none: leads.filter((l) => !l.next_followup_date && !l.converted && !isClosed(l)),
-    completed: leads.filter((l) => activityLeadIds.has(l.id)),
+    today: scoped.filter((l) => l.next_followup_date === today),
+    tomorrow: scoped.filter((l) => l.next_followup_date === tomorrow),
+    upcoming: scoped.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) > 1),
+    overdue: scoped.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0),
+    none: scoped.filter((l) => !l.next_followup_date && !l.converted && !isClosed(l)),
+    completed: scoped.filter((l) => activityLeadIds.has(l.id)),
   };
   const tabs: [string, string][] = [["today", "Today"], ["tomorrow", "Tomorrow"], ["upcoming", "Upcoming"], ["overdue", "Overdue"], ["none", "No follow-up"], ["completed", "Completed"]];
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-4 text-ink">Follow-up Center</h2>
+      <h2 className="text-lg font-semibold mb-3 text-ink">Follow-up Center</h2>
+      {!isAdmin && sharing && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <ScopeToggle value={effectiveScope} onChange={setScope} />
+          {effectiveScope !== "mine" && (
+            <span className="text-xs text-slate-500">Free to help? Open a colleague's lead and log your call. It's recorded under your name.</span>
+          )}
+        </div>
+      )}
       <div className="flex gap-1 mb-4 border-b border-slate-200 overflow-x-auto whitespace-nowrap">
         {tabs.map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)} className={`px-3.5 py-2 text-sm font-medium relative flex-shrink-0 ${tab === k ? "text-navy" : "text-slate-400"}`}>
@@ -74,6 +101,7 @@ export default function FollowUpCenterPage() {
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Lead</th>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Location</th>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Status</th>
+                {showAssigned && <th className="text-left px-4 py-2.5 font-medium text-slate-500">Assigned</th>}
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Last call note</th>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Follow-up</th>
                 <th></th>
@@ -84,6 +112,7 @@ export default function FollowUpCenterPage() {
                     <td className="px-4 py-2.5"><div className="font-medium text-ink">{l.name?.trim() ? l.name : <span className="text-amber-600 italic">Name pending</span>}</div><div className="text-xs text-slate-400 flex items-center gap-1">{l.lead_code} · <PhoneLink number={l.mobile} /></div></td>
                     <td className="px-4 py-2.5 text-slate-600">{l.location || <span className="text-slate-300">—</span>}</td>
                     <td className="px-4 py-2.5"><Badge>{l.status}</Badge></td>
+                    {showAssigned && <td className="px-4 py-2.5 text-slate-600">{staffName(l.assigned_staff_id)}</td>}
                     <td className="px-4 py-2.5 max-w-xs">
                       <div className="text-xs text-slate-600 whitespace-normal break-words line-clamp-2">
                         {latestNotes[l.id] || <span className="italic text-slate-400">No notes yet</span>}
@@ -110,6 +139,7 @@ export default function FollowUpCenterPage() {
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <Badge>{l.status}</Badge>
                   {l.location && <span className="text-xs text-slate-500">{l.location}</span>}
+                  {showAssigned && <span className="text-xs text-slate-400">· {staffName(l.assigned_staff_id)}</span>}
                 </div>
                 <div className="text-xs text-slate-600 whitespace-normal break-words line-clamp-2">
                   {latestNotes[l.id] || <span className="italic text-slate-400">No notes yet</span>}

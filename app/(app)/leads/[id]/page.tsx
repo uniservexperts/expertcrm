@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, LeadActivity, Profile, fmtDate, toLocalDateStr, followUpLabel, followUpTone, FOLLOWUP_TYPES, LEAD_SOURCES } from "@/lib/types";
+import { Lead, LeadActivity, Profile, fmtDate, toLocalDateStr, followUpLabel, followUpTone, FOLLOWUP_TYPES, LEAD_SOURCES, buildLatestNoteMap } from "@/lib/types";
 import { Badge, Btn, Field, inputCls, Modal, PhoneLink } from "@/components/ui";
 
 export default function LeadDetailPage() {
@@ -14,6 +14,7 @@ export default function LeadDetailPage() {
   const [activities, setActivities] = useState<LeadActivity[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [staffOptions, setStaffOptions] = useState<Profile[]>([]);
+  const [staffAll, setStaffAll] = useState<Profile[]>([]);
   const [note, setNote] = useState("");
   const [lastNoteText, setLastNoteText] = useState("");
   const [statusVal, setStatusVal] = useState("");
@@ -47,16 +48,16 @@ export default function LeadDetailPage() {
     setCountries(countryRows || []);
     const { data: acts } = await supabase.from("lead_activities").select("*").eq("lead_id", id).order("created_at");
     setActivities(acts || []);
-    const noteActs = (acts || []).filter((a) => a.activity_type === "Note added" && a.detail?.trim());
-    const latestNote = noteActs.length ? noteActs[noteActs.length - 1].detail.trim() : "";
+    const latestNote = buildLatestNoteMap(
+      [...(acts || [])].reverse().map((a) => ({ lead_id: id, activity_type: a.activity_type, detail: a.detail }))
+    )[id] || "";
     setNote(latestNote);
     setLastNoteText(latestNote);
     const { data: statusRows } = await supabase.from("lead_statuses").select("name").order("sort_order");
     setStatuses((statusRows || []).map((s) => s.name));
-    if (profile?.role === "admin") {
-      const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff").eq("active", true);
-      setStaffOptions(staffRows || []);
-    }
+    const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff");
+    setStaffAll(staffRows || []);
+    if (profile?.role === "admin") setStaffOptions((staffRows || []).filter((s: Profile) => s.active));
     setLoading(false);
   }
   useEffect(() => { load(); }, [id]);
@@ -154,6 +155,8 @@ export default function LeadDetailPage() {
   if (loading) return <div className="text-slate-500 text-sm">Loading…</div>;
   if (!lead) return <div className="text-slate-500 text-sm">Lead not found, or you don't have access to it.</div>;
   const isAdmin = me?.role === "admin";
+  const assignedName = staffAll.find((s) => s.id === lead.assigned_staff_id)?.full_name || "Unassigned";
+  const isColleaguesLead = !isAdmin && !!me && lead.assigned_staff_id !== me.id;
 
   return (
     <div>
@@ -162,6 +165,11 @@ export default function LeadDetailPage() {
       </h2>
       <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-4">
+          {isColleaguesLead && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              This lead is assigned to <b>{assignedName}</b>. You're helping on it, and everything you add is logged under your name.
+            </div>
+          )}
           {!editingDetails ? (
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><div className="text-xs text-slate-400">Mobile</div><PhoneLink number={lead.mobile} className="text-sm" /></div>
@@ -169,6 +177,7 @@ export default function LeadDetailPage() {
               <div><div className="text-xs text-slate-400">Country</div><div>{countries.find((c) => c.id === lead.country_id)?.name || "—"}</div></div>
               <div><div className="text-xs text-slate-400">Source</div><div>{lead.source || "—"}</div></div>
               <div><div className="text-xs text-slate-400">Created</div><div>{fmtDate(toLocalDateStr(lead.created_at))}</div></div>
+              <div><div className="text-xs text-slate-400">Assigned to</div><div>{assignedName}</div></div>
               <div className="col-span-2">
                 <Btn variant="ghost" onClick={() => setEditingDetails(true)}>Edit name / location / country / source</Btn>
               </div>

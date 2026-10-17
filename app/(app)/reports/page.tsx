@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { todayStr, dayDiff, DOC_KEYS, LEAD_SOURCES } from "@/lib/types";
 import { StatCard, statusDotColor } from "@/components/ui";
+import { fetchAllRows } from "@/lib/fetchAll";
 import { Users, CheckCircle2, XCircle, TrendingUp, CalendarClock, AlertTriangle, Clock, Briefcase, FileText, IndianRupee, ShieldAlert } from "lucide-react";
 
 const CLOSING_STATUSES = ["Not Interested"];
@@ -26,8 +27,10 @@ export default function ReportsPage() {
       const admin = profile?.role === "admin";
       setIsAdmin(admin);
 
-      const { data: leadRows } = await supabase.from("leads").select("*");
-      setLeads(leadRows || []);
+      const allRows = await fetchAllRows<any>((from, to) =>
+        supabase.from("leads").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
+      // Staff reports are about their OWN leads only, even if team sharing is on
+      setLeads(admin ? allRows : allRows.filter((l: any) => l.assigned_staff_id === user.id));
       const { data: countryRows } = await supabase.from("countries").select("*");
       setCountries(countryRows || []);
       const { data: statusRows } = await supabase.from("lead_statuses").select("name").order("sort_order");

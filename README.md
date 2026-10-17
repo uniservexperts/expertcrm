@@ -168,3 +168,6 @@ in one and a Staff member in the other, and verify:
 
 - `supabase/add_last_activity.sql` — adds a "last updated" timestamp to leads so the
   Leads list can sort recently-updated leads to the top.
+- `supabase/share_leads_between_staff.sql` — lets staff view and work on each other's leads
+  (Admin can switch this on/off in Settings). Staff still cannot reassign leads, convert
+  them to clients, or touch Clients / payments / documents.

@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, Client, Profile, todayStr, toLocalDateStr, dayDiff, followUpLabel, followUpTone, DOC_KEYS } from "@/lib/types";
 import { StatCard, Badge, statusDotColor, PhoneLink } from "@/components/ui";
+import { fetchAllRows } from "@/lib/fetchAll";
 import { Inbox, CalendarClock, AlertTriangle, Clock, Briefcase, FileText, IndianRupee, BadgeCheck, XCircle, ShieldAlert } from "lucide-react";
 
 export default function DashboardPage() {
   const supabase = createClient();
   const [me, setMe] = useState<Profile | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [teamLeads, setTeamLeads] = useState<Lead[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [staff, setStaff] = useState<Profile[]>([]);
   const [activitiesToday, setActivitiesToday] = useState<any[]>([]);
@@ -24,8 +26,16 @@ export default function DashboardPage() {
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       setMe(profile);
 
-      const { data: leadRows } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
-      setLeads(leadRows || []);
+      const allRows = await fetchAllRows<Lead>((from, to) =>
+        supabase.from("leads").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
+      if (profile?.role === "admin") {
+        setLeads(allRows);
+      } else {
+        // Staff: the numbers on this page are about THEIR leads. Colleagues' leads
+        // (visible only if the Admin turned team sharing on) are kept separate.
+        setLeads(allRows.filter((l) => l.assigned_staff_id === user.id));
+        setTeamLeads(allRows.filter((l) => l.assigned_staff_id !== user.id));
+      }
 
       const { data: statusRows } = await supabase.from("lead_statuses").select("name").order("sort_order");
       setStatuses((statusRows || []).map((s) => s.name));
@@ -52,6 +62,9 @@ export default function DashboardPage() {
   const upcoming = leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) > 0).length;
   const overdueLeads = leads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).slice(0, 6);
   const todayLeads = leads.filter((l) => l.next_followup_date === today).slice(0, 6);
+
+  const teamOverdue = teamLeads.filter((l) => l.next_followup_date && dayDiff(l.next_followup_date) < 0).length;
+  const teamDueToday = teamLeads.filter((l) => l.next_followup_date === today).length;
 
   const docsPending = (c: any) => DOC_KEYS.some(([k]) => !c.client_documents?.find((d: any) => d.doc_key === k)?.received);
   const balance = (c: any) => c.total_fee - (c.payments || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
@@ -82,6 +95,17 @@ export default function DashboardPage() {
           <StatCard label="Upcoming follow-ups" value={upcoming} link="/followups" icon={Clock} />
         </div>
       </div>
+
+      {!isAdmin && teamLeads.length > 0 && (
+        <div>
+          <div className="text-sm font-semibold mb-1 text-ink">Colleagues' leads</div>
+          <div className="text-xs text-slate-500 mb-3">If a teammate is busy, you can pick up their follow-ups.</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Their overdue follow-ups" value={teamOverdue} tone="red" link="/followups?scope=others" icon={AlertTriangle} />
+            <StatCard label="Their follow-ups today" value={teamDueToday} tone="brass" link="/followups?scope=others" icon={CalendarClock} />
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="text-sm font-semibold mb-3 text-ink">{isAdmin ? "All leads by status" : "My leads by status"}</div>

@@ -3,9 +3,11 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, Profile, followUpLabel, followUpTone, LEAD_SOURCES, buildLatestNoteMap } from "@/lib/types";
-import { Badge, Btn, Field, Modal, inputCls, PhoneLink } from "@/components/ui";
+import { Lead, Profile, Scope, inScope, followUpLabel, followUpTone, LEAD_SOURCES, buildLatestNoteMap } from "@/lib/types";
+import { Badge, Btn, Field, Modal, inputCls, PhoneLink, ScopeToggle } from "@/components/ui";
 import { fetchAllRows } from "@/lib/fetchAll";
+import { useScope } from "@/lib/useScope";
+import { useTeamSharing } from "@/lib/useTeamSharing";
 import { Search, X } from "lucide-react";
 
 const CLOSING_STATUSES = ["Not Interested"];
@@ -33,6 +35,9 @@ function LeadsPageInner() {
   const [latestNotes, setLatestNotes] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("updated");
+  const [allStaff, setAllStaff] = useState<Profile[]>([]);
+  const sharing = useTeamSharing();
+  const [scope, setScope] = useScope();
 
   const staffIdParam = searchParams.get("staffId");
   const countryIdParam = searchParams.get("countryId");
@@ -53,22 +58,25 @@ function LeadsPageInner() {
       supabase.from("lead_activities").select("lead_id, activity_type, detail, created_at").in("activity_type", ["Note added", "Lead updated"]).order("created_at", { ascending: false }).order("id").range(from, to));
     setLatestNotes(buildLatestNoteMap(noteRows));
 
-    if (profile?.role === "admin") {
-      const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff").eq("active", true);
-      setStaffOptions(staffRows || []);
-    }
+    const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff");
+    setAllStaff(staffRows || []);
+    if (profile?.role === "admin") setStaffOptions((staffRows || []).filter((s: Profile) => s.active));
     const { data: countryRows } = await supabase.from("countries").select("*");
     setCountries(countryRows || []);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
 
-  const staffMap = Object.fromEntries(staffOptions.map((s) => [s.id, s.full_name]));
+  const staffMap = Object.fromEntries(allStaff.map((s) => [s.id, s.full_name]));
   const countryMap = Object.fromEntries(countries.map((c) => [c.id, c.name]));
   const isAdmin = me?.role === "admin";
-  const statuses = [...new Set(leads.map((l) => l.status))];
+  // Staff see "mine" by default; with team sharing on they can switch to colleagues' leads
+  const effectiveScope: Scope = isAdmin ? "all" : sharing ? scope : "mine";
+  const baseLeads = me ? leads.filter((l) => inScope(l.assigned_staff_id, effectiveScope, me.id)) : leads;
+  const showAssigned = isAdmin || (sharing && effectiveScope !== "mine");
+  const statuses = [...new Set(baseLeads.map((l) => l.status))];
 
-  let filtered = statusFilter === "all" ? leads : leads.filter((l) => l.status === statusFilter);
+  let filtered = statusFilter === "all" ? baseLeads : baseLeads.filter((l) => l.status === statusFilter);
   if (staffIdParam) filtered = filtered.filter((l) => l.assigned_staff_id === staffIdParam);
   if (countryIdParam) filtered = filtered.filter((l) => l.country_id === Number(countryIdParam));
   if (sourceParam) filtered = filtered.filter((l) => l.source === sourceParam);
@@ -153,7 +161,7 @@ function LeadsPageInner() {
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h2 className="text-lg font-semibold text-ink">{isAdmin ? "All leads" : "My leads"}</h2>
+        <h2 className="text-lg font-semibold text-ink">{isAdmin ? "All leads" : effectiveScope === "others" ? "Colleagues' leads" : effectiveScope === "all" ? "All team leads" : "My leads"}</h2>
         <div className="flex gap-2">
           <select className="border border-slate-200 rounded-md px-2.5 py-1.5 text-sm flex-1 sm:flex-none" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">All statuses</option>
@@ -162,6 +170,15 @@ function LeadsPageInner() {
           <Btn onClick={() => setShowNew(true)}>+ New lead</Btn>
         </div>
       </div>
+
+      {!isAdmin && sharing && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <ScopeToggle value={effectiveScope} onChange={setScope} />
+          {effectiveScope !== "mine" && (
+            <span className="text-xs text-slate-500">You can update colleagues' leads too. Your changes are logged under your name.</span>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2 sm:flex-row mb-3">
         <div className="relative flex-1">
@@ -193,7 +210,7 @@ function LeadsPageInner() {
         </select>
       </div>
       <div className="text-xs text-slate-400 mb-3">
-        {filtered.length === leads.length ? `${leads.length} leads` : `Showing ${filtered.length} of ${leads.length} leads`}
+        {filtered.length === baseLeads.length ? `${baseLeads.length} leads` : `Showing ${filtered.length} of ${baseLeads.length} leads`}
       </div>
 
       {hasUrlFilter && (
@@ -216,7 +233,7 @@ function LeadsPageInner() {
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Location</th>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Status</th>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Last call note</th>
-                {isAdmin && <th className="text-left px-4 py-2.5 font-medium text-slate-500">Assigned</th>}
+                {showAssigned && <th className="text-left px-4 py-2.5 font-medium text-slate-500">Assigned</th>}
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Next follow-up</th>
                 <th></th>
               </tr></thead>
@@ -231,7 +248,7 @@ function LeadsPageInner() {
                         {latestNotes[l.id] || <span className="italic text-slate-400">No notes yet</span>}
                       </div>
                     </td>
-                    {isAdmin && <td className="px-4 py-2.5">{staffMap[l.assigned_staff_id || ""] || "Unassigned"}</td>}
+                    {showAssigned && <td className="px-4 py-2.5">{staffMap[l.assigned_staff_id || ""] || "Unassigned"}</td>}
                     <td className="px-4 py-2.5"><Badge tone={followUpTone(l.next_followup_date)}>{followUpLabel(l.next_followup_date)}</Badge></td>
                     <td className="px-4 py-2.5 text-right"><Link href={`/leads/${l.id}`} className="text-xs font-medium text-navy3">Open →</Link></td>
                   </tr>
@@ -253,7 +270,7 @@ function LeadsPageInner() {
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <Badge>{l.status}</Badge>
                   {l.location && <span className="text-xs text-slate-500">{l.location}</span>}
-                  {isAdmin && <span className="text-xs text-slate-400">· {staffMap[l.assigned_staff_id || ""] || "Unassigned"}</span>}
+                  {showAssigned && <span className="text-xs text-slate-400">· {staffMap[l.assigned_staff_id || ""] || "Unassigned"}</span>}
                 </div>
                 <div className="text-xs text-slate-600 whitespace-normal break-words line-clamp-2">
                   {latestNotes[l.id] || <span className="italic text-slate-400">No notes yet</span>}

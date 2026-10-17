@@ -15,6 +15,9 @@ export default function SettingsPage() {
   const [newStaff, setNewStaff] = useState({ full_name: "", email: "", password: "" });
   const [staffErr, setStaffErr] = useState("");
   const [staffMsg, setStaffMsg] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const [sharingAvailable, setSharingAvailable] = useState(true);
+  const [sharingMsg, setSharingMsg] = useState("");
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -36,6 +39,9 @@ export default function SettingsPage() {
       setStatuses(s || []);
       const { data: st } = await supabase.from("profiles").select("*").eq("role", "staff");
       setStaff(st || []);
+      const { data: sh, error: shErr } = await supabase.from("app_settings").select("value").eq("key", "staff_share_leads").maybeSingle();
+      if (shErr) setSharingAvailable(false);
+      else { setSharingAvailable(true); setSharing(sh?.value === "true"); }
     }
     setLoading(false);
   }
@@ -54,6 +60,15 @@ export default function SettingsPage() {
     if (error) { setPwErr(error.message); return; }
     setPwMsg("Password updated. Use it next time you sign in on any device.");
     setNewPassword(""); setConfirmPassword("");
+  }
+
+  async function toggleSharing() {
+    const next = !sharing;
+    setSharingMsg("");
+    const { error } = await supabase.from("app_settings").upsert({ key: "staff_share_leads", value: next ? "true" : "false" });
+    if (error) { setSharingMsg(error.message); return; }
+    setSharing(next);
+    setSharingMsg(next ? "On: staff can now see and work on each other's leads." : "Off: staff see only their own leads again.");
   }
 
   async function addCountry() {
@@ -103,6 +118,35 @@ export default function SettingsPage() {
 
       {isAdmin && (
         <>
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-ink">Staff can see and work on each other's leads</div>
+                <div className="text-xs text-slate-500 mt-1">
+                  When on, any staff member can open a colleague's lead, add notes, change status and set follow-ups, which helps when someone is busy.
+                  Only you can reassign or convert leads, and Clients, payments and documents stay Admin-only.
+                  Every action is logged under the person who did it.
+                </div>
+              </div>
+              {sharingAvailable && (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={sharing}
+                  aria-label="Staff can see each other's leads"
+                  onClick={toggleSharing}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors ${sharing ? "bg-emerald-500" : "bg-slate-300"}`}
+                >
+                  <span className={`inline-block h-5 w-5 mt-0.5 rounded-full bg-white shadow transition-transform ${sharing ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              )}
+            </div>
+            {!sharingAvailable && (
+              <div className="text-xs text-amber-700 mt-3">Not set up yet: run <b>supabase/share_leads_between_staff.sql</b> once in your Supabase SQL Editor, then reload this page.</div>
+            )}
+            {sharingMsg && <div className="text-xs text-slate-600 mt-3">{sharingMsg}</div>}
+          </div>
+
           <div>
             <div className="text-sm font-semibold mb-3 text-ink">Staff members</div>
             <div className="rounded-lg border border-slate-200 divide-y mb-3 bg-white">

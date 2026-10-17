@@ -128,3 +128,22 @@ export function PhoneLink({ number, className = "" }: { number: string; classNam
     </a>
   );
 }
+
+// "My leads | Colleagues | Everyone" switch shown to staff when team sharing is on
+export function ScopeToggle({ value, onChange }: { value: string; onChange: (v: any) => void }) {
+  const opts: [string, string][] = [["mine", "My leads"], ["others", "Colleagues"], ["all", "Everyone"]];
+  return (
+    <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5 text-sm">
+      {opts.map(([k, label]) => (
+        <button
+          key={k}
+          type="button"
+          onClick={() => onChange(k)}
+          className={`px-3 py-1.5 rounded font-medium transition ${value === k ? "bg-navy text-white" : "text-slate-600 hover:bg-slate-50"}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}

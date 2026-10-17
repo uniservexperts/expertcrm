@@ -45,6 +45,14 @@ export type Client = {
   notes: string | null;
 };
 
+// Which leads a staff member is looking at when team sharing is on
+export type Scope = "mine" | "others" | "all";
+export function inScope(assignedStaffId: string | null, scope: Scope, myId: string) {
+  if (scope === "all") return true;
+  if (scope === "mine") return assignedStaffId === myId;
+  return assignedStaffId !== myId; // colleagues' leads (and unassigned ones)
+}
+
 export const DOC_KEYS: [string, string][] = [
   ["passportFront", "Passport Front"],
   ["passportBack", "Passport Back"],
