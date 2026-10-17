@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Home, ClipboardList, Calendar, Briefcase, FileText, Settings, LogOut, Menu, X } from "lucide-react";
+import { Home, ClipboardList, Calendar, Briefcase, FileText, Settings, LogOut, Menu, X, Users } from "lucide-react";
 
 export default function SidebarNav({ profile }: { profile: { full_name: string; role: string } }) {
   const pathname = usePathname();
@@ -18,6 +18,7 @@ export default function SidebarNav({ profile }: { profile: { full_name: string; 
         ["/followups", "Follow-up Center", Calendar],
         ["/clients", "Clients", Briefcase],
         ["/reports", "Reports", FileText],
+        ["/staff-reports", "Staff Reports", Users],
         ["/settings", "Settings", Settings],
       ]
     : [

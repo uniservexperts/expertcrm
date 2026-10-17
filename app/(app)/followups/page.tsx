@@ -29,6 +29,18 @@ export default function FollowUpCenterPage() {
   const [allStaff, setAllStaff] = useState<Profile[]>([]);
   const sharing = useTeamSharing();
   const [scope, setScope] = useScope();
+  const [staffFilter, setStaffFilter] = useState<string | null>(null);
+
+  // Links from the Admin's Staff Reports page open this screen pre-filtered
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const sid = p.get("staffId");
+      const t = p.get("tab");
+      if (sid) setStaffFilter(sid);
+      if (t && ["today", "tomorrow", "upcoming", "overdue", "none", "completed"].includes(t)) setTab(t);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -58,7 +70,8 @@ export default function FollowUpCenterPage() {
   const isAdmin = me?.role === "admin";
   // Staff see their own follow-ups by default; with team sharing on they can switch to colleagues'
   const effectiveScope: Scope = isAdmin ? "all" : sharing ? scope : "mine";
-  const scoped = me ? leads.filter((l) => inScope(l.assigned_staff_id, effectiveScope, me.id)) : leads;
+  const scopedByRole = me ? leads.filter((l) => inScope(l.assigned_staff_id, effectiveScope, me.id)) : leads;
+  const scoped = staffFilter ? scopedByRole.filter((l) => l.assigned_staff_id === staffFilter) : scopedByRole;
   const showAssigned = isAdmin || (sharing && effectiveScope !== "mine");
   const staffName = (id: string | null) => allStaff.find((s) => s.id === id)?.full_name || "Unassigned";
   const buckets: Record<string, Lead[]> = {
@@ -74,6 +87,13 @@ export default function FollowUpCenterPage() {
   return (
     <div>
       <h2 className="text-lg font-semibold mb-3 text-ink">Follow-up Center</h2>
+      {staffFilter && (
+        <div className="mb-3 flex items-center gap-2 text-sm">
+          <span className="text-slate-500">Filtered by:</span>
+          <Badge tone="blue">Staff: {staffName(staffFilter)}</Badge>
+          <button type="button" onClick={() => setStaffFilter(null)} className="text-xs text-navy3 underline">Clear filter</button>
+        </div>
+      )}
       {!isAdmin && sharing && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <ScopeToggle value={effectiveScope} onChange={setScope} />

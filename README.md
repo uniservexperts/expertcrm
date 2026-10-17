@@ -171,3 +171,9 @@ in one and a Staff member in the other, and verify:
 - `supabase/share_leads_between_staff.sql` — lets staff view and work on each other's leads
   (Admin can switch this on/off in Settings). Staff still cannot reassign leads, convert
   them to clients, or touch Clients / payments / documents.
+
+## Staff Reports (Admin only)
+
+`/staff-reports` shows a team comparison table plus a separate full report for each
+staff member (workload, activity for a chosen date range, leads by status, and a log of
+what they did). No database changes are needed for this page.

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Lead, Client, Profile, todayStr, toLocalDateStr, dayDiff, followUpLabel, followUpTone, DOC_KEYS } from "@/lib/types";
 import { StatCard, Badge, statusDotColor, PhoneLink } from "@/components/ui";
 import { fetchAllRows } from "@/lib/fetchAll";
+import { classifyActivity } from "@/lib/activity";
 import { Inbox, CalendarClock, AlertTriangle, Clock, Briefcase, FileText, IndianRupee, BadgeCheck, XCircle, ShieldAlert } from "lucide-react";
 
 export default function DashboardPage() {
@@ -182,16 +183,17 @@ export default function DashboardPage() {
               <tbody>
                 {staff.map((s) => {
                   const acts = activitiesToday.filter((a) => a.actor_id === s.id);
-                  const count = (type: string) => acts.filter((a) => a.activity_type === type).length;
+                  const flags = acts.map((a) => classifyActivity(a.activity_type, a.detail));
+                  const count = (k: "created" | "note" | "status" | "followupSet" | "followupDone") => flags.filter((f) => f[k]).length;
                   const uniqueLeads = new Set(acts.map((a) => a.lead_id)).size;
                   return (
                     <tr key={s.id} className="border-t border-slate-200">
                       <td className="px-4 py-2">{s.full_name}</td>
-                      <td className="px-4 py-2">{count("Lead created")}</td>
-                      <td className="px-4 py-2">{count("Note added")}</td>
-                      <td className="px-4 py-2">{count("Status changed")}</td>
-                      <td className="px-4 py-2">{count("Follow-up scheduled")}</td>
-                      <td className="px-4 py-2">{count("Follow-up completed")}</td>
+                      <td className="px-4 py-2">{count("created")}</td>
+                      <td className="px-4 py-2">{count("note")}</td>
+                      <td className="px-4 py-2">{count("status")}</td>
+                      <td className="px-4 py-2">{count("followupSet")}</td>
+                      <td className="px-4 py-2">{count("followupDone")}</td>
                       <td className="px-4 py-2 font-medium">{uniqueLeads}</td>
                     </tr>
                   );

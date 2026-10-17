@@ -81,6 +81,20 @@ export function todayStr() {
 export function toLocalDateStr(isoTimestamp: string) {
   return localDateStr(new Date(isoTimestamp));
 }
+// Add n days to a YYYY-MM-DD string (local calendar, DST-safe)
+export function addDaysStr(dateStr: string, n: number) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return localDateStr(d);
+}
+// Inclusive local date range -> UTC timestamps [start, end) for database queries
+export function localRangeToISO(from: string, to: string) {
+  return {
+    startISO: new Date(from + "T00:00:00").toISOString(),
+    endISO: new Date(addDaysStr(to, 1) + "T00:00:00").toISOString(),
+  };
+}
+
 export function dayDiff(dateStr: string) {
   const a = new Date(todayStr() + "T00:00:00");
   const b = new Date(dateStr + "T00:00:00");
