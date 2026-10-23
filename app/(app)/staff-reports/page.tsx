@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Lead, Profile, todayStr, toLocalDateStr, dayDiff, fmtDate, addDaysStr, localRangeToISO } from "@/lib/types";
 import { classifyActivity } from "@/lib/activity";
 import { fetchAllRows } from "@/lib/fetchAll";
+import { useClosingStatuses } from "@/lib/useClosingStatuses";
 import { StatCard, Badge, statusDotColor } from "@/components/ui";
 import { Users, ClipboardList, AlertTriangle, CalendarClock, Clock, Inbox, CheckCircle2, TrendingUp, FileText, BadgeCheck } from "lucide-react";
 
@@ -37,6 +38,7 @@ export default function StaffReportsPage() {
   const [from, setFrom] = useState(todayStr());
   const [to, setTo] = useState(todayStr());
   const [selectedId, setSelectedId] = useState("");
+  const closing = useClosingStatuses();
 
   // Load staff, leads and statuses once (Admin only)
   useEffect(() => {
@@ -93,7 +95,7 @@ export default function StaffReportsPage() {
   // One metrics object per staff member
   const metrics = staff.map((s) => {
     const mine = leads.filter((l) => l.assigned_staff_id === s.id);
-    const active = mine.filter((l) => !l.converted && l.status !== "Not Interested");
+    const active = mine.filter((l) => !l.converted && !closing.includes(l.status));
     const myActs = acts.filter((a) => a.actor_id === s.id);
     const flags = myActs.map((a) => classifyActivity(a.activity_type, a.detail));
     const count = (k: "note" | "status" | "followupSet" | "followupDone") => flags.filter((f) => f[k]).length;

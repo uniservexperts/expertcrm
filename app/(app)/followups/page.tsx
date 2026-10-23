@@ -7,6 +7,7 @@ import { Lead, Profile, Scope, inScope, todayStr, dayDiff, followUpLabel, follow
 import { Badge, PhoneLink, ScopeToggle } from "@/components/ui";
 import { useScope } from "@/lib/useScope";
 import { useTeamSharing } from "@/lib/useTeamSharing";
+import { useClosingStatuses } from "@/lib/useClosingStatuses";
 
 function addDays(dateStr: string, n: number) {
   const d = new Date(dateStr + "T00:00:00");
@@ -29,6 +30,7 @@ export default function FollowUpCenterPage() {
   const [allStaff, setAllStaff] = useState<Profile[]>([]);
   const sharing = useTeamSharing();
   const [scope, setScope] = useScope();
+  const CLOSING_STATUSES = useClosingStatuses();
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
 
   // Links from the Admin's Staff Reports page open this screen pre-filtered
@@ -65,7 +67,6 @@ export default function FollowUpCenterPage() {
 
   const today = todayStr();
   const tomorrow = addDays(today, 1);
-  const CLOSING_STATUSES = ["Not Interested"];
   const isClosed = (l: Lead) => CLOSING_STATUSES.includes(l.status);
   const isAdmin = me?.role === "admin";
   // Staff see their own follow-ups by default; with team sharing on they can switch to colleagues'

@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase/client";
 import { todayStr, dayDiff, DOC_KEYS, LEAD_SOURCES } from "@/lib/types";
 import { StatCard, statusDotColor } from "@/components/ui";
 import { fetchAllRows } from "@/lib/fetchAll";
+import { useClosingStatuses } from "@/lib/useClosingStatuses";
 import { Users, CheckCircle2, XCircle, TrendingUp, CalendarClock, AlertTriangle, Clock, Briefcase, FileText, IndianRupee, ShieldAlert } from "lucide-react";
 
-const CLOSING_STATUSES = ["Not Interested"];
 
 export default function ReportsPage() {
   const supabase = createClient();
   const [isAdmin, setIsAdmin] = useState(false);
+  const CLOSING_STATUSES = useClosingStatuses();
   const [leads, setLeads] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);

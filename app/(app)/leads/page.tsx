@@ -3,14 +3,16 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lead, Profile, Scope, inScope, followUpLabel, followUpTone, LEAD_SOURCES, buildLatestNoteMap } from "@/lib/types";
+import { Lead, Profile, Scope, inScope, followUpLabel, followUpTone, LEAD_SOURCES, buildLatestNoteMap, todayStr } from "@/lib/types";
 import { Badge, Btn, Field, Modal, inputCls, PhoneLink, ScopeToggle } from "@/components/ui";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { useScope } from "@/lib/useScope";
 import { useTeamSharing } from "@/lib/useTeamSharing";
-import { Search, X } from "lucide-react";
-
-const CLOSING_STATUSES = ["Not Interested"];
+import { useClosingStatuses } from "@/lib/useClosingStatuses";
+import { Search, X, Download } from "lucide-react";
+import { sortLeads, SORT_DEFS, SortKey, SortDir } from "@/lib/leadSort";
+import { buildXlsx, downloadFile, XLSX_MIME } from "@/lib/xlsx";
+import { leadsToRows, toCsv, EXPORT_HEADERS, EXPORT_WIDTHS } from "@/lib/export";
 
 export default function LeadsPage() {
   return (
@@ -34,10 +36,14 @@ function LeadsPageInner() {
   const [loading, setLoading] = useState(true);
   const [latestNotes, setLatestNotes] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("updated");
+  const [sortKey, setSortKey] = useState<SortKey>("updated");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [statusOrder, setStatusOrder] = useState<string[]>([]);
+  const [exportOpen, setExportOpen] = useState(false);
   const [allStaff, setAllStaff] = useState<Profile[]>([]);
   const sharing = useTeamSharing();
   const [scope, setScope] = useScope();
+  const CLOSING_STATUSES = useClosingStatuses();
 
   const staffIdParam = searchParams.get("staffId");
   const countryIdParam = searchParams.get("countryId");
@@ -58,6 +64,9 @@ function LeadsPageInner() {
       supabase.from("lead_activities").select("lead_id, activity_type, detail, created_at").in("activity_type", ["Note added", "Lead updated"]).order("created_at", { ascending: false }).order("id").range(from, to));
     setLatestNotes(buildLatestNoteMap(noteRows));
 
+    const { data: stRows } = await supabase.from("lead_statuses").select("name").order("sort_order");
+    setStatusOrder((stRows || []).map((x: any) => x.name));
+
     const { data: staffRows } = await supabase.from("profiles").select("*").eq("role", "staff");
     setAllStaff(staffRows || []);
     if (profile?.role === "admin") setStaffOptions((staffRows || []).filter((s: Profile) => s.active));
@@ -74,7 +83,8 @@ function LeadsPageInner() {
   const effectiveScope: Scope = isAdmin ? "all" : sharing ? scope : "mine";
   const baseLeads = me ? leads.filter((l) => inScope(l.assigned_staff_id, effectiveScope, me.id)) : leads;
   const showAssigned = isAdmin || (sharing && effectiveScope !== "mine");
-  const statuses = [...new Set(baseLeads.map((l) => l.status))];
+  const presentStatuses = new Set(baseLeads.map((l) => l.status));
+  const statuses = [...statusOrder.filter((x) => presentStatuses.has(x)), ...Array.from(presentStatuses).filter((x) => !statusOrder.includes(x))];
 
   let filtered = statusFilter === "all" ? baseLeads : baseLeads.filter((l) => l.status === statusFilter);
   if (staffIdParam) filtered = filtered.filter((l) => l.assigned_staff_id === staffIdParam);
@@ -98,35 +108,48 @@ function LeadsPageInner() {
     );
   }
 
-  // Sort (default: most recently updated first)
-  const touched = (l: Lead) => new Date(l.last_activity_at || l.created_at).getTime();
-  filtered = [...filtered].sort((a, b) => {
-    switch (sortBy) {
-      case "created_desc": return +new Date(b.created_at) - +new Date(a.created_at);
-      case "created_asc": return +new Date(a.created_at) - +new Date(b.created_at);
-      case "name": {
-        const an = (a.name || "").trim(), bn = (b.name || "").trim();
-        if (!an && !bn) return 0;
-        if (!an) return 1;
-        if (!bn) return -1;
-        return an.localeCompare(bn, undefined, { sensitivity: "base" });
-      }
-      case "followup": {
-        if (!a.next_followup_date && !b.next_followup_date) return touched(b) - touched(a);
-        if (!a.next_followup_date) return 1;
-        if (!b.next_followup_date) return -1;
-        return a.next_followup_date.localeCompare(b.next_followup_date);
-      }
-      default: return touched(b) - touched(a);
-    }
-  });
+  // Sort. "Assigned to" only exists as an option when assignees are shown.
+  const effKey: SortKey = sortKey === "assigned" && !showAssigned ? "updated" : sortKey;
+  const effDir: SortDir = sortKey === "assigned" && !showAssigned ? "desc" : sortDir;
+  filtered = sortLeads(filtered, effKey, effDir, { statusOrder, staffName: (id) => staffMap[id || ""] || "" });
+
+  // Tap a column heading to sort by it; tap again to reverse
+  function toggleSort(k: SortKey) {
+    if (effKey === k) setSortDir(effDir === "asc" ? "desc" : "asc");
+    else { setSortKey(k); setSortDir(SORT_DEFS.find((d) => d.key === k)!.defaultDir); }
+  }
+  const sortHead = (k: SortKey, label: string) => (
+    <th className="text-left px-4 py-2.5 font-medium text-slate-500">
+      <button
+        type="button"
+        onClick={() => toggleSort(k)}
+        title={`Sort by ${label.toLowerCase()}`}
+        className={`inline-flex items-center gap-1 hover:text-ink ${effKey === k ? "text-ink" : ""}`}
+      >
+        {label}<span className="text-xs">{effKey === k ? (effDir === "asc" ? "↑" : "↓") : ""}</span>
+      </button>
+    </th>
+  );
+
+  // Export exactly what is on screen: current search, filters and sort order
+  function doExport(kind: "xlsx" | "csv") {
+    setExportOpen(false);
+    const rows = leadsToRows(filtered, {
+      staffName: (id) => staffMap[id || ""] || "",
+      countryName: (id) => (id ? countryMap[id] : "") || "",
+      notes: latestNotes,
+    });
+    const base = `leads-${todayStr()}`;
+    if (kind === "xlsx") downloadFile(buildXlsx("Leads", EXPORT_HEADERS, rows, EXPORT_WIDTHS), `${base}.xlsx`, XLSX_MIME);
+    else downloadFile(toCsv(EXPORT_HEADERS, rows), `${base}.csv`, "text/csv;charset=utf-8");
+  }
 
   const filterLabels: string[] = [];
   if (staffIdParam) filterLabels.push(`Staff: ${staffMap[staffIdParam] || staffIdParam}`);
   if (countryIdParam) filterLabels.push(`Country: ${countryMap[Number(countryIdParam)] || countryIdParam}`);
   if (sourceParam) filterLabels.push(`Source: ${sourceParam}`);
   if (specialParam === "converted") filterLabels.push("Converted leads");
-  if (specialParam === "closed") filterLabels.push("Closed (Not Interested)");
+  if (specialParam === "closed") filterLabels.push("Closed (no follow-up needed)");
   if (specialParam === "active") filterLabels.push("Still active leads");
 
   async function createLead(form: any) {
@@ -167,6 +190,29 @@ function LeadsPageInner() {
             <option value="all">All statuses</option>
             {statuses.map((s) => <option key={s}>{s}</option>)}
           </select>
+          {isAdmin && (
+            <div className="relative">
+              <Btn variant="ghost" onClick={() => setExportOpen((o) => !o)}><Download size={15} /> Export</Btn>
+              {exportOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} />
+                  <div className="absolute right-0 mt-1 w-72 max-w-[85vw] z-20 rounded-lg border border-slate-200 bg-white shadow-lg p-1">
+                    <div className="px-3 py-2 text-xs text-slate-500">
+                      Exports the <b>{filtered.length}</b> {filtered.length === 1 ? "lead" : "leads"} shown, using your current search, filters and sort.
+                    </div>
+                    <button type="button" disabled={!filtered.length} onClick={() => doExport("xlsx")} className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 disabled:opacity-40">
+                      <div className="text-sm font-medium text-ink">Excel (.xlsx)</div>
+                      <div className="text-xs text-slate-500">Recommended. Phone numbers and dates stay correct.</div>
+                    </button>
+                    <button type="button" disabled={!filtered.length} onClick={() => doExport("csv")} className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 disabled:opacity-40">
+                      <div className="text-sm font-medium text-ink">CSV (.csv)</div>
+                      <div className="text-xs text-slate-500">For importing into other tools.</div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <Btn onClick={() => setShowNew(true)}>+ New lead</Btn>
         </div>
       </div>
@@ -197,16 +243,19 @@ function LeadsPageInner() {
           )}
         </div>
         <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
+          value={`${effKey}:${effDir}`}
+          onChange={(e) => { const [k, d] = e.target.value.split(":"); setSortKey(k as SortKey); setSortDir(d as SortDir); }}
           aria-label="Sort leads"
-          className="border border-slate-200 rounded-md px-2.5 py-2 text-sm bg-white sm:w-56"
+          className="border border-slate-200 rounded-md px-2.5 py-2 text-sm bg-white sm:w-64"
         >
-          <option value="updated">Sort: Recently updated</option>
-          <option value="created_desc">Sort: Newest added</option>
-          <option value="created_asc">Sort: Oldest added</option>
-          <option value="followup">Sort: Follow-up date (soonest)</option>
-          <option value="name">Sort: Name A–Z</option>
+          {SORT_DEFS.filter((d) => d.key !== "assigned" || showAssigned).flatMap((d) => {
+            const other: SortDir = d.defaultDir === "asc" ? "desc" : "asc";
+            return [d.defaultDir, other].map((dir) => (
+              <option key={`${d.key}:${dir}`} value={`${d.key}:${dir}`}>
+                {`Sort: ${d.label}, ${dir === "asc" ? d.asc : d.desc}`}
+              </option>
+            ));
+          })}
         </select>
       </div>
       <div className="text-xs text-slate-400 mb-3">
@@ -229,12 +278,12 @@ function LeadsPageInner() {
           <div className="hidden md:block rounded-lg border border-slate-200 overflow-hidden bg-white">
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-50">
-                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Lead</th>
-                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Location</th>
-                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Status</th>
+                {sortHead("name", "Lead")}
+                {sortHead("location", "Location")}
+                {sortHead("status", "Status")}
                 <th className="text-left px-4 py-2.5 font-medium text-slate-500">Last call note</th>
-                {showAssigned && <th className="text-left px-4 py-2.5 font-medium text-slate-500">Assigned</th>}
-                <th className="text-left px-4 py-2.5 font-medium text-slate-500">Next follow-up</th>
+                {showAssigned && sortHead("assigned", "Assigned")}
+                {sortHead("followup", "Next follow-up")}
                 <th></th>
               </tr></thead>
               <tbody>

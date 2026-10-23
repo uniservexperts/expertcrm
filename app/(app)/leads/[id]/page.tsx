@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Lead, LeadActivity, Profile, fmtDate, toLocalDateStr, followUpLabel, followUpTone, FOLLOWUP_TYPES, LEAD_SOURCES, buildLatestNoteMap } from "@/lib/types";
 import { Badge, Btn, Field, inputCls, Modal, PhoneLink } from "@/components/ui";
+import { useClosingStatuses } from "@/lib/useClosingStatuses";
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,7 +67,7 @@ export default function LeadDetailPage() {
     await supabase.from("lead_activities").insert({ lead_id: id, actor_id: me!.id, actor_name: me!.full_name, activity_type: type, detail });
   }
 
-  const CLOSING_STATUSES = ["Not Interested"];
+  const CLOSING_STATUSES = useClosingStatuses();
   async function saveUpdate() {
     if (!lead) return;
     const changes: string[] = [];

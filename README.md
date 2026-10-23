@@ -177,3 +177,18 @@ in one and a Staff member in the other, and verify:
 `/staff-reports` shows a team comparison table plus a separate full report for each
 staff member (workload, activity for a chosen date range, leads by status, and a log of
 what they did). No database changes are needed for this page.
+- `supabase/status_rules.sql` — adds the per-status "No follow-up needed" setting and clears
+  follow-up dates on leads that are Not Interested / Cancelled / Closed / Completed.
+
+## Settings: removing countries and statuses
+
+Settings -> Countries / Lead statuses now have a remove (bin) button. If leads (or clients,
+for countries) still use the item, you choose what to move them to first; each moved lead
+gets a note in its timeline. "New Lead" and "Confirmed Client" are used by the system itself
+and cannot be removed.
+
+## Leads: sorting and export
+
+- Sort from the dropdown, or tap a column heading (tap again to reverse). Default is "Last updated, newest first".
+- Admin sees an **Export** button: Excel (.xlsx, recommended) or CSV of exactly the leads shown
+  (current search, filters and sort). No database changes needed.
