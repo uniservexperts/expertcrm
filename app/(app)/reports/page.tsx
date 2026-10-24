@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { todayStr, dayDiff, DOC_KEYS, LEAD_SOURCES } from "@/lib/types";
 import { StatCard, statusDotColor } from "@/components/ui";
 import { fetchAllRows } from "@/lib/fetchAll";
+import DayWiseReport from "@/components/DayWiseReport";
 import { useClosingStatuses } from "@/lib/useClosingStatuses";
 import { Users, CheckCircle2, XCircle, TrendingUp, CalendarClock, AlertTriangle, Clock, Briefcase, FileText, IndianRupee, ShieldAlert } from "lucide-react";
 
@@ -12,6 +13,7 @@ import { Users, CheckCircle2, XCircle, TrendingUp, CalendarClock, AlertTriangle,
 export default function ReportsPage() {
   const supabase = createClient();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [meId, setMeId] = useState("");
   const CLOSING_STATUSES = useClosingStatuses();
   const [leads, setLeads] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -27,6 +29,7 @@ export default function ReportsPage() {
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       const admin = profile?.role === "admin";
       setIsAdmin(admin);
+      setMeId(user.id);
 
       const allRows = await fetchAllRows<any>((from, to) =>
         supabase.from("leads").select("*").order("created_at", { ascending: false }).order("id").range(from, to));
@@ -62,6 +65,8 @@ export default function ReportsPage() {
   return (
     <div className="space-y-8">
       <h2 className="text-lg font-semibold text-ink">{isAdmin ? "Reports" : "My reports"}</h2>
+
+      <DayWiseReport isAdmin={isAdmin} meId={meId} leads={leads} statuses={statuses} closing={CLOSING_STATUSES} staff={staff} />
 
       <div>
         <div className="text-sm font-semibold mb-3 text-ink">Leads</div>

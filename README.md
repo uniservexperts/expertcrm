@@ -192,3 +192,9 @@ and cannot be removed.
 - Sort from the dropdown, or tap a column heading (tap again to reverse). Default is "Last updated, newest first".
 - Admin sees an **Export** button: Excel (.xlsx, recommended) or CSV of exactly the leads shown
   (current search, filters and sort). No database changes needed.
+
+## Day-wise report (Reports page)
+
+Reports -> "Day-wise report": new leads added and status counts for each of the last 7 / 14 / 30 days,
+for the whole team and as a separate table per staff member. Tick boxes choose which counts to show.
+Staff see the same report for their own numbers only. No database changes needed.
